@@ -45,6 +45,9 @@
 
 // CMU
 
+// Frequency of HFRCO
+#define F_HFRCO (14*1000*1000)
+
 #define CMU_BASE2 0x400c8000
 
 #define CMU_HFPERCLKDIV  ((volatile uint32_t*)(CMU_BASE2 + 0x008))
@@ -112,6 +115,11 @@
 #define DAC0_CH1DATA  ((volatile uint32_t*)(DAC0_BASE2 + 0x024))
 #define DAC0_COMBDATA ((volatile uint32_t*)(DAC0_BASE2 + 0x028))
 
+#define DAC_CHCTRL_PRSEN        (1<<2)
+#define DAC_CHCTRL_PRSSEL_POS   (4)
+#define DAC_CHCHRL_PRSSEL_MASK  (0xF << DAC_CHCTRL_PRSSEL_POS)
+#define DAC_CHCTRL_PRSCH0       (0 << DAC_CHCTRL_PRSSEL_POS)
+
 // DMA
 
 #define DMA_BASE 0x400c2000
@@ -134,6 +142,13 @@
 #define PRS_BASE 0x400cc000
 
 #define PRS_CH0_CTRL ((volatile uint32_t*)(PRS_BASE + 0x010))
+#define PRS_CTRL_SOURCESEL_POS 16
+#define PRS_CTRL_SOURCESEL_MASK (0x3F << PRS_CTRL_SOURCESEL_POS)
+#define PRS_CTRL_SIGSEL_POS 0
+#define PRS_CTRL_SIGSEL_MASK (0x7 << PRS_CTRL_SIGSEL_POS)
+
+#define PRS_CTRL_SOURCESEL_TIMER1 (0x1D << PRS_CTRL_SOURCESEL_POS)
+#define PRS_CTRL_SIGSEL_TIMER1OF (0x1 << PRS_CTRL_SIGSEL_POS)
 
 // System Control Block
 

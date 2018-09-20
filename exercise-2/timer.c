@@ -25,7 +25,7 @@ void setupTimer(uint16_t period)
     *CMU_HFPERCLKEN0 |= (1<<6);
 
     // Set period
-    *TIMER1_TOP = 7*100*1000;
+    *TIMER1_TOP = period;
 
     // Enabe timer interrupt generation
     *TIMER1_IEN |= 1;

@@ -9,10 +9,11 @@
  * from) runs at 14 MHz by default. Also remember that the timer counter
  * registers are 16 bits. 
  */
-/*
- * The period between sound samples, in clock cycles 
- */
-#define   SAMPLE_PERIOD   0
+
+// The sampling frequency in Hz
+#define     SAMPLING_FREQUENCY 2000
+// The period between sound samples, in clock cycles 
+#define   SAMPLE_PERIOD_CYCLES (F_HFRCO/SAMPLING_FREQUENCY)
 
 /*
  * Declaration of peripheral setup functions 
@@ -35,7 +36,7 @@ int main(void)
 	setupDAC();
     // NOTE: Sine generation does not work yet
     // enableDACSineGenerationMode();
-	setupTimer(SAMPLE_PERIOD);
+	setupTimer(SAMPLE_PERIOD_CYCLES);
 
 	/*
 	 * Enable interrupt handling 
