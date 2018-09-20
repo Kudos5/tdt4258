@@ -4,6 +4,7 @@
  */
 #include <stdint.h>
 #include <stdio.h>
+#include "seqs.h"
 
 #define NO_EVENT 0x00000000
 #define SEQ_TERMINATOR 0x00000000
@@ -58,20 +59,20 @@ void print_event(uint32_t event, float* total_time){
 /**
  * Function that shows how sequences can be triggered and how events can be read from memory
  */
-void showcase_sequence(uint32_t* seq_start, uint32_t* current_event)
+void showcase_sequence(const uint32_t* seq_start, uint32_t* current_event)
 {
 	/* Don't trigger a new sequence if one is already running */
 	if (current_event != NO_EVENT)
 		return;
 
     /* If no sequences running, start the given sequence */
-	current_event = seq_start;	// 
+	current_event = (uint32_t*)seq_start;	// 
     int ev_number = 0;
     float total_time = 0.0;
 
 	/* Play all the events in the sequence */
 	while (*current_event != SEQ_TERMINATOR) {
-		printf("event #%d:  ", ev_number++, current_event);
+		printf("event #%d:  ", ev_number++);
         print_event(*current_event, &total_time);
 		current_event += 1;	    // Set current_event to address of the next event
 	}
@@ -84,27 +85,7 @@ void showcase_sequence(uint32_t* seq_start, uint32_t* current_event)
 int main(int argv, char **argc)
 {
 
-	/* Generate event sequences */
 	uint32_t *current_event = NO_EVENT;
-	uint32_t seq1[] = {
-		0x034e0001,
-		0xffff0002,
-		0x00000003,
-		0x0000ae14,
-		0x0000ee18,
-		0x0000801f,
-		SEQ_TERMINATOR	// This must be included to terminate our sequence
-	};
-	uint32_t seq2[] = {
-        0x046e2800,
-        0x04dc0a0c,
-        0x05b8190c,
-        0x059f6419,
-        0x055d3219,
-        0x055d3219,
-        SEQ_TERMINATOR
-	};
-
   	printf("Sequence 2\n");
   	showcase_sequence(seq2, current_event);
 
