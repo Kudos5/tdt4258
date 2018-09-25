@@ -37,6 +37,8 @@ sleep:
 
 .thumb_func
 gpio_handler:  
+    // Assuming interrupt uses lr, store it in stack 
+    push {lr}
     // load register from memory
     ldr r0, =GPIO_PC_BASE
     /* ^ This is a pseudoinstruction. ldr does not actually take immediates, but
@@ -80,7 +82,9 @@ gpio_handler:
     cmp r1, 0b10000000
     it eq
     bleq decrease_led_drive_strength
-    bx lr       // assuming the link register is updated upon interrupt. TODO: Find out if this is the case 
+    // Get interrupt lr from stack
+    pop {lr}
+    bx lr
 
 
 /////////////////////////////////////////////////////////////////////////////
