@@ -21,14 +21,12 @@ _reset:
     bl enable_leds
     bl enable_buttons
     bl enable_interrupts
-sleep:
     ldr r0, =SCR
     mov r1, 6
     str r1, [r0]
+sleep:
     wfi        // wait for interrupt (sleep)
     b sleep    // go back to sleep after returning from interrupt
-    // bl gpio_handler
-    // b sleep
 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -42,16 +40,10 @@ sleep:
 
 .thumb_func
 gpio_handler:  
-    // Assuming interrupt uses lr, store it in stack 
+    // Push link register value to stack (for branching back from the interrupt)
     push {lr}
-    // load register from memory
-    // ldr r0, =GPIO_PC_BASE
+    // load GPIO base address from memory
     ldr r0, =GPIO_BASE
-    /* ^ This is a pseudoinstruction. ldr does not actually take immediates, but
-     * puts them in a [literal pool](https://en.wikipedia.org/wiki/Literal_pool)
-     * that it reads from during runtime. */
-    /* Instead of reading the actual pin state, we read the GPIO_IF register to
-     * see which pin was changed. That way we don't have to bitmask before comparison  */
     ldr r1, [r0, GPIO_IF]
     // Clear the interrupt to avoid repeating interrupts
     str r1, [r0, GPIO_IFC]
@@ -59,70 +51,68 @@ gpio_handler:
     // Load button state
     ldr r0, =GPIO_PC_BASE
     ldr r1, [r0, GPIO_DIN]
-    // Assumes that the interrupt is active high. TODO: Is this the case?
-    // If a left/right button was pressed, move the light to the left/right
-    // check right
+
+    /************************************************************************/
+    /**** Check which button was pressed and take the appropriate action ****/
+
+    /* Move the light in the right direction if left / right was pressed */
+    // Check right buttons
     cmp r1, 0b11111011
-    // cmp r1, 0b00000100
     it eq
     bleq move_led_right
     cmp r1, 0b10111111
-    // cmp r1, 0b01000000
     it eq
     bleq move_led_right
-    // check left
+
+    // Check left buttons
     cmp r1, 0b11111110
-    // cmp r1, 0b00000001
     it eq
     bleq move_led_left
     cmp r1, 0b11101111
-    // cmp r1, 0b00010000
     it eq
     bleq move_led_left
 
-    // If up/down button was pressed then increase/decrease brightness
-    // check up
+    /* If up/down button was pressed then increase/decrease brightness */
+    // Check up buttons
     cmp r1, 0b11111101
-    // cmp r1, 0b00000010
     it eq
     bleq increase_led_drive_strength
     cmp r1, 0b11011111
-    // cmp r1, 0b00100000
     it eq
     bleq increase_led_drive_strength
-    // check down
+    // Check down buttons
     cmp r1, 0b11110111
-    // cmp r1, 0b00001000
     it eq
     bleq decrease_led_drive_strength
     cmp r1, 0b01111111
-    // cmp r1, 0b10000000
     it eq
     bleq decrease_led_drive_strength
+    /************************************************************************/
+
     // Get interrupt lr from stack
     pop {lr}
     bx lr
 
-
 /////////////////////////////////////////////////////////////////////////////
 
-.thumb_func
-dummy_handler:  
-    b .  // do nothing
 
+/////////////////////////////////////////////////////////////////////////////
+//
+// Setup procedures
+// Enable GPIO and interrupts
+//
 /////////////////////////////////////////////////////////////////////////////
 
 .thumb_func
 enable_interrupts:
     /* Enable interrupts for GPIO C when its state changes */
-    // ldr r0, =GPIO_PC_BASE
     ldr r1, =0x22222222
     ldr r0, =GPIO_BASE
     str r1, [r0, #GPIO_EXTIPSELL]
-    // Set up the GPIO to interrupt when a bit changes from 1 to 0
+    // Set up the GPIO to interrupt when a bit changes from 1 to 0 (button pressed)
     mov r1, 0xFF
     str r1, [r0, #GPIO_EXTIFALL]
-    // Set up the GPIO to interrupt when a bit changes from 0 to 1
+    /* Do _not* set up the GPIO to interrupt when a bit changes from 0 to 1 */
     // str r1, [r0, #GPIO_EXTIRISE]
     // Set up interrupt generation
     str r1, [r0, #GPIO_IEN]
@@ -138,9 +128,9 @@ enable_interrupts:
 
 .thumb_func
 enable_gpio_clock:
-    // load the cmu base address
+    // Load the cmu base address
     ldr r1, =CMU_BASE
-    // load current value of HFPERCLK_ENABLE
+    // Load current value of HFPERCLK_ENABLE
     ldr r2, [r1, #CMU_HFPERCLKEN0]
     // Set the gpio enable bit
     mov r3, #1
@@ -151,3 +141,9 @@ enable_gpio_clock:
     // Return to caller
     bx lr
     
+/////////////////////////////////////////////////////////////////////////////
+
+.thumb_func
+dummy_handler:  
+    b .  // do nothing
+
