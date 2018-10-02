@@ -27,7 +27,7 @@ void setupTimer(uint16_t period)
     // Set period
     *TIMER1_TOP = period;
 
-    // Enabe timer interrupt generation
+    // Enable timer interrupt generation
     *TIMER1_IEN |= 1;
 
     // Start timer
