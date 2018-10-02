@@ -22,8 +22,8 @@ void setupDAC()
     *(DAC0_CTRL) = 0x50010;
 
     // Enable left and right channels
-    *(DAC0_CH0CTRL) = 1;
-    *(DAC0_CH1CTRL) = 1;
+    *(DAC0_CH0CTRL) |= 1;
+    *(DAC0_CH1CTRL) |= 1;
 }
 
 // NOTE: Sine generation does not work yet
