@@ -3,6 +3,9 @@
 
 #include "efm32gg.h"
 
+void EnableSound();
+void DisableSound();
+
 /*
  * TIMER1 interrupt handler 
  */
@@ -14,12 +17,29 @@ void __attribute__ ((interrupt)) TIMER1_IRQHandler()
 	 */
 
     // Write data to DAC
-    *DAC0_CH1DATA = ~(*DAC0_CH1DATA) & 0x0FF;
-    *DAC0_CH0DATA = ~(*DAC0_CH0DATA) & 0x0FF;
+    *DAC0_CH1DATA = ~(*DAC0_CH1DATA) & 0x00F;
+    *DAC0_CH0DATA = ~(*DAC0_CH0DATA) & 0x00F;
 
     // clear pending interrupt
     *TIMER1_IFC |= 1;
 
+}
+
+void GPIO_HANDLER() {
+    // Read button state
+    uint16_t button_state = *GPIO_PC_DIN;
+    // Activate LEDs corresponding to the buttons pressed
+    *GPIO_PA_DOUT = button_state << 8;
+    // If the first left button is pressed play a sound
+    if ( button_state == ((~(1 << 0)) & 0xFF) ) {
+        EnableSound();
+    }
+    // If the right button is pressed, stop the sound
+    else if ( button_state == ((~(1 << 1)) & 0xFF) ) {
+        DisableSound();
+    }
+    // Clear the interrupt to avoid repeating interrupts
+    *GPIO_IFC |= *GPIO_IF;
 }
 
 /*
@@ -27,10 +47,7 @@ void __attribute__ ((interrupt)) TIMER1_IRQHandler()
  */
 void __attribute__ ((interrupt)) GPIO_EVEN_IRQHandler()
 {
-	/*
-	 * TODO handle button pressed event, remember to clear pending
-	 * interrupt 
-	 */
+    GPIO_HANDLER();
 }
 
 /*
@@ -38,8 +55,5 @@ void __attribute__ ((interrupt)) GPIO_EVEN_IRQHandler()
  */
 void __attribute__ ((interrupt)) GPIO_ODD_IRQHandler()
 {
-	/*
-	 * TODO handle button pressed event, remember to clear pending
-	 * interrupt 
-	 */
+    GPIO_HANDLER();
 }
