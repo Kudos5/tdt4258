@@ -23,6 +23,9 @@ void setupTimer(uint32_t period);
 void setupDAC();
 void enableDACSineGenerationMode();
 void setupNVIC();
+void PollButtons();
+void EnableSound();
+void DisableSound();
 
 /*
  * Your code will start executing here 
@@ -47,9 +50,37 @@ int main(void)
 	 * TODO for higher energy efficiency, sleep while waiting for
 	 * interrupts instead of infinite loop for busy-waiting 
 	 */
+    // PollButtons();
 	while (1) ;
 
 	return 0;
+}
+
+void PollButtons() {
+    while (1) {
+        // Read button state
+        uint16_t button_state = *GPIO_PC_DIN;
+        // Activate LEDs corresponding to the buttons pressed
+        *GPIO_PA_DOUT = button_state << 8;
+        // If the first left button is pressed play a sound
+        if ( button_state == ((~(1 << 0)) & 0xFF) ) {
+            EnableSound();
+        }
+        // If the right button is pressed, stop the sound
+        else if ( button_state == ((~(1 << 1)) & 0xFF) ) {
+            DisableSound();
+        }
+    }
+}
+
+void EnableSound() {
+    // Enable timer interrupt generation
+    *TIMER1_IEN |= 1;
+}
+
+void DisableSound() {
+    // Disable timer interrupt generation
+    *TIMER1_IEN &= ~(1 << 0);
 }
 
 void setupNVIC()
@@ -63,7 +94,12 @@ void setupNVIC()
 	 * assignment. 
 	 */
 
+    // Enable Timer1 IRQ Handler
     *ISER0 |= (1 << 12);
+    // Enable GPIO even handler
+    *ISER0 |= (1 << 1);
+    // Enable GPIO odd handler
+    *ISER0 |= (1 << 11);
 
 }
 
