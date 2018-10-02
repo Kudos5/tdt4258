@@ -66,3 +66,8 @@ New knowledge
   Example: `bx lr` will branch to the address stored in the link register (lr).
 
 
+### Some More About Pseudoinstructions
+- `ldr` *immediate* version is a pseudoinstruction. The "instruction"
+  `ldr r0, =GPIO_BASE` doesn't actually take immediates, but puts the constant
+  values in a [literal pool](https://en.wikipedia.org/wiki/Literal_pool) that
+  it reads from during runtime.
