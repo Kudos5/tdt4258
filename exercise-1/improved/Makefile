@@ -4,6 +4,7 @@ OBJCOPY=arm-none-eabi-objcopy
 
 LDFLAGS=-nostdlib
 ASFLAGS=-mcpu=cortex-m3 -mthumb -g
+IDIR=../include
 
 PROGRAM=ex1-interrupt.bin 
 UPLOAD=-eACommander.sh -r --address 0x00000000 -f $(PROGRAM) -r
@@ -20,10 +21,10 @@ all: $(PROGRAM)
 	${OBJCOPY} -j .text -O binary $< $@
 
 %.elf : %.o
-	${LD} -T ${LINKERSCRIPT} $^ -o $@ ${LDFLAGS} 
+	${LD} -L${IDIR} -T ${LINKERSCRIPT} $^ -o $@ ${LDFLAGS} 
 
 %.o : %.s
-	${AS} ${ASFLAGS} $< -o $@
+	${AS} -I${IDIR} ${ASFLAGS} $< -o $@
 
 .PHONY : upload
 upload :

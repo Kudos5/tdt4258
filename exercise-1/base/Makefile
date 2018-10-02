@@ -1,6 +1,7 @@
 LD=arm-none-eabi-gcc
 AS=arm-none-eabi-as
 OBJCOPY=arm-none-eabi-objcopy
+IDIR=../include
 
 LDFLAGS=-nostdlib
 ASFLAGS=-mcpu=cortex-m3 -mthumb -g
@@ -20,10 +21,10 @@ all: $(PROGRAM)
 	${OBJCOPY} -j .text -O binary $< $@
 
 %.elf : %.o
-	${LD} -T ${LINKERSCRIPT} $^ -o $@ ${LDFLAGS} 
+	${LD} -L${IDIR} -T ${LINKERSCRIPT} $^ -o $@ ${LDFLAGS} 
 
 %.o : %.s
-	${AS} ${ASFLAGS} $< -o $@
+	${AS} ${ASFLAGS} -I${IDIR} $< -o $@
 
 .PHONY : upload
 upload :
