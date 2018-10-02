@@ -63,8 +63,6 @@ decrease_led_drive_strength:
     done_decrease_led_drive_strength:
     str r1, [r0, GPIO_CTRL]
     bx lr
-       // Get the current drive strength
-    bx lr
 
 
 .thumb_func
@@ -79,8 +77,7 @@ move_led_right:
 
     // If the LED on the right end, bit 15, is active, 
     // we wrap around
-    // TODO
-    // Test if bit 8 is clear
+    // Test if bit 15 is clear
     tst r2, #(1<<15)
     itte eq
     // Set bit 15
@@ -89,7 +86,7 @@ move_led_right:
     biceq r2, #(1<<8) 
     // Else we shift to the left(led moves right)
     lslne r2, r2, 1
-
+    // Store new LED state
     str r2, [r0, GPIO_DOUT]
     bx lr
 
@@ -105,7 +102,6 @@ move_led_left:
 
     // If the LED on the left end, bit 8, is active, 
     // we wrap around
-    // TODO
     // Test if bit 8 is clear
     tst r2, #(1<<8)
     itte eq
@@ -115,7 +111,7 @@ move_led_left:
     biceq r2, #(1<<15) 
     // Else we shift to the left(led moves right)
     lsrne r2, r2, 1
-
+    // Store new LED state
     str r2, [r0, GPIO_DOUT]
     bx lr
 
