@@ -9,12 +9,12 @@
 #include "showcase.h"
 
 /* Global variables must be declared here, not in the header */
-uint16_t seq_counter = 0;          // Simulates sequencer timer clock
-uint16_t aud_counter = 0;          // Simulates audio timer clock
+uint32_t seq_counter = 0;          // Simulates sequencer timer clock
+uint32_t aud_counter = 0;          // Simulates audio timer clock
 uint64_t cpu_counter = 0;          // Simulates the CPU clock
 uint64_t sim_counter = 0;          // For keeping track of position in the wave array
-volatile uint16_t* TIMER_AUD_CNT = &aud_counter;
-volatile uint16_t* TIMER_SEQ_CNT = &seq_counter;
+volatile uint32_t* TIMER_AUD_CNT = &aud_counter;
+volatile uint32_t* TIMER_SEQ_CNT = &seq_counter;
 
 /** Write to WAV using libsndfile **/
 void write_wav(int16_t* wave_array, uint32_t wave_len) {

@@ -9,7 +9,7 @@ CFLAGS=-mcpu=cortex-m3 -mthumb -g -std=c99 -Wall -Wextra -Wpedantic
 LDFLAGS=-mcpu=cortex-m3 -mthumb -g -lgcc -lc -lcs3 -lcs3unhosted -lefm32gg -Llib
 ASFLAGS=-mcpu=cortex-m3 -mthumb -g
 LINKERSCRIPT=lib/efm32gg.ld
-OBJ=dac.o gpio.o timer.o interrupt_handlers.o
+OBJ=dac.o gpio.o timer.o interrupt_handlers.o sound.o
 
 
 # Prevent removing intermediate elf and object files

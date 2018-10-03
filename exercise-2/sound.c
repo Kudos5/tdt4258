@@ -1,11 +1,13 @@
 #include "sound.h"
 #include "showcase.h"   // TODO : Remove after testing
 
+
 ///////////////////////////////////////////////////////////////////////////////
 // 
 // Generators
 // 
 ///////////////////////////////////////////////////////////////////////////////
+//
 static uint32_t GENERATORS_ON = 0;                     // Bitmask for setting which generators are active                                           
 
 enum {SAW, SQUARE, TRIANGLE};
@@ -14,7 +16,7 @@ void triangle();
 void sawtooth();
 typedef struct gen_struct {
     uint32_t frequency;         // Current frequency of the generator
-    uint16_t time_for_change;   // Used in audio interrupt to see if the waveform should change direction or something
+    uint32_t time_for_change;   // Used in audio interrupt to see if the waveform should change direction or something
     int16_t  current_value;     // This is where the output sample of each generator is set and read from
     uint16_t playing;           // Currently not used, as we use GENERATORS_ON instead. Not sure what's best for maintaining playing generators
     void (*GENERATOR)();
@@ -32,25 +34,31 @@ void generator_setup(){
 }
 
 
-/* Set the frequency of a generator 'manually'. Used for testing in the main file */
-void set_gen_freq(uint32_t gen, uint32_t freq){
-    generators[gen].frequency = freq;
-}
-
 /** 
  * Update the square wave generator.
  * TODO : Find out whether 2's complement or not. All the generators depend on it.
  */
 void square() {
+    static int32_t halfway = 0;
     /* If it is time to change the waveform direction */
     if (*TIMER_AUD_CNT == generators[SQUARE].time_for_change){     // TODO : This 'if' is common for all generators, so maybe extract it?
-        generators[SQUARE].time_for_change = (aud_counter + AUDIO_HZ /(2*generators[SQUARE].frequency)) % MAXVAL16; // update the time for next change.
+        generators[SQUARE].time_for_change = (*TIMER_AUD_CNT + AUDIO_HZ /(generators[SQUARE].frequency)) % MAXVAL16; // time_for_change is one period from now
+        halfway = (*TIMER_AUD_CNT + AUDIO_HZ /(2*generators[SQUARE].frequency)) % MAXVAL16; // used to flip the wave on half periods 
         if (generators[SQUARE].current_value <= 0) {        // Use toggling instead (except for the initialization)
             generators[SQUARE].current_value = GEN_HIGH;      // replace with the correct velocity later. 
         } else {
             generators[SQUARE].current_value = GEN_LOW;
         }
-    } 
+    } else if (*TIMER_AUD_CNT == halfway){
+        /* This halfway thing is here to avoid 'off-by-1-sample' errors*/
+        // In case of halfway, just flip the bit, and set halfway equal to 'whole way'
+        if (generators[SQUARE].current_value <= 0) {        // Use toggling instead (except for the initialization)
+            generators[SQUARE].current_value = GEN_HIGH;      // replace with the correct velocity later. 
+        } else {
+            generators[SQUARE].current_value = GEN_LOW;
+        }
+        halfway = generators[SQUARE].time_for_change;
+    }
 }
 
 void sawtooth() {
@@ -78,14 +86,15 @@ void triangle() {
 }
 
 // To run on note ons
-void generator_start(uint32_t gen) {
+void generator_start(uint32_t gen, uint32_t freq) {
     /* NOTE: Only one 'on' flag per generator => only monophonic instruments supported 
      * If notes overlap in this protocol, the first note is overwritten! */
     GENERATORS_ON |= (1 << gen);   // Set the 'on' flag for the given generator
     // TODO : Start the generator 
     generators[gen].time_for_change = *TIMER_AUD_CNT;   // Make the waveform change instantly
     generators[gen].current_value = 0;
-    generators[gen].GENERATOR();                      // update the value
+    generators[gen].frequency = freq;
+    generators[gen].GENERATOR();                        // Run the updater function immediately
 }
 
 // To run on note offs
@@ -123,7 +132,6 @@ int16_t audio_update(){
 // 
 ///////////////////////////////////////////////////////////////////////////////
 
-
 // Define static global variables for keeping track 
 static uint32_t* next_event = NO_EVENT;   // NO_EVENT is just 0.. 
 static uint32_t next_event_time = 0;      // Used for telling sequencer_update when next event should be triggered 
@@ -160,10 +168,9 @@ void sequencer_update(){
         char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
         uint32_t inst = (*next_event >> INST_POS) & INST_MASK;
         uint32_t freq = (*next_event >> FREQ_POS) & FREQ_MASK;
-        set_gen_freq(inst, freq);   // Why not just include a frequency parameter in the generator_start?
         // If the event is a 'note on' event:
         if (*next_event & TYPE_MASK) {
-            generator_start(inst);
+            generator_start(inst, freq);
         } else {
             generator_stop(inst);
         }
