@@ -9,15 +9,15 @@
 static uint32_t GENERATORS_ON = 0;                     // Bitmask for setting which generators are active                                           
 
 enum {SAW, SQUARE, TRIANGLE};
-int16_t square();
-int16_t triangle();
-int16_t sawtooth();
+void square();
+void triangle();
+void sawtooth();
 typedef struct gen_struct {
     uint32_t frequency;         // Current frequency of the generator
     uint16_t time_for_change;   // Used in audio interrupt to see if the waveform should change direction or something
     int16_t  current_value;     // This is where the output sample of each generator is set and read from
     uint16_t playing;           // Currently not used, as we use GENERATORS_ON instead. Not sure what's best for maintaining playing generators
-    int16_t (*GENERATOR)();
+    void (*GENERATOR)();
 } generator; 
 static generator generators[NUM_GENERATORS];
 
@@ -41,9 +41,9 @@ void set_gen_freq(uint32_t gen, uint32_t freq){
  * Update the square wave generator.
  * TODO : Find out whether 2's complement or not. All the generators depend on it.
  */
-int16_t square() {
+void square() {
     /* If it is time to change the waveform direction */
-    if (aud_counter == generators[SQUARE].time_for_change){     // TODO : This 'if' is common for all generators, so maybe extract it?
+    if (*TIMER_AUD_CNT == generators[SQUARE].time_for_change){     // TODO : This 'if' is common for all generators, so maybe extract it?
         generators[SQUARE].time_for_change = (aud_counter + AUDIO_HZ /(2*generators[SQUARE].frequency)) % MAXVAL16; // update the time for next change.
         if (generators[SQUARE].current_value <= 0) {        // Use toggling instead (except for the initialization)
             generators[SQUARE].current_value = GEN_HIGH;      // replace with the correct velocity later. 
@@ -51,15 +51,11 @@ int16_t square() {
             generators[SQUARE].current_value = GEN_LOW;
         }
     } 
-    return generators[SQUARE].current_value;    // Return the value so that the function can be used by the main file
-}
-int16_t triangle() {
-    return 0;
 }
 
-int16_t sawtooth() {
+void sawtooth() {
     static int16_t increment = 0;
-    if (aud_counter == generators[SAW].time_for_change){
+    if (*TIMER_AUD_CNT == generators[SAW].time_for_change){
         /** Whenever we reach a time to change, we do the following:
          *  - Wrap around (or initialize) to the lowest possible value 
          *  - Update the 'time_for_change'
@@ -69,7 +65,7 @@ int16_t sawtooth() {
          */
         int16_t period = AUDIO_HZ / generators[SAW].frequency;
         increment = GEN_RANGE / period;
-        generators[SAW].time_for_change = (aud_counter + period) % MAXVAL16; 
+        generators[SAW].time_for_change = (*TIMER_AUD_CNT + period) % MAXVAL16; 
         generators[SAW].current_value = GEN_LOW;
     } else {
         /* If we haven't reached the time_to_change just keep incrementing */
@@ -77,20 +73,23 @@ int16_t sawtooth() {
     }
 }
 
+void triangle() {
+    return;
+}
 
 // To run on note ons
-void start_generator(uint32_t gen) {
+void generator_start(uint32_t gen) {
     /* NOTE: Only one 'on' flag per generator => only monophonic instruments supported 
      * If notes overlap in this protocol, the first note is overwritten! */
     GENERATORS_ON |= (1 << gen);   // Set the 'on' flag for the given generator
     // TODO : Start the generator 
-    generators[gen].time_for_change = aud_counter;   // Make the waveform change instantly
+    generators[gen].time_for_change = *TIMER_AUD_CNT;   // Make the waveform change instantly
     generators[gen].current_value = 0;
     generators[gen].GENERATOR();                      // update the value
 }
 
 // To run on note offs
-void stop_generator(uint32_t gen) {
+void generator_stop(uint32_t gen) {
     GENERATORS_ON &= ~(1 << gen);   // Clear the 'on' flag for the given generator
     generators[gen].current_value = 0;
 }
@@ -99,7 +98,7 @@ void stop_generator(uint32_t gen) {
 /** 
  * Function that should be called on AUDIO_TIMER interrupts
  */
-void audio_interrupt(){
+int16_t audio_update(){
     /** Tasks of this section:
      * 1. Read from gen_current_value and mix them
      * 2. Put the result of the mix into the DAC register (or the wave_samples, in the case of simulation)
@@ -107,14 +106,14 @@ void audio_interrupt(){
      */
     //if (GENERATORS_ON )
     /* update the gen_current_value */
+    int16_t new_sample = 0;
     for (int gen = 0; gen < NUM_GENERATORS; gen++) {
         if (GENERATORS_ON & (1 << gen)) {
             generators[gen].GENERATOR(); 
-            wave_samples[sim_counter] += 16*generators[gen].current_value;
-            // TODO : The '16' is just to scale from 12 to 16 bits for showcasing. 
-            // Change it when stuff works.
+            new_sample += generators[gen].current_value;
         }
     }
+    return new_sample;
 }
 
 
@@ -127,48 +126,57 @@ void audio_interrupt(){
 
 // Define static global variables for keeping track 
 static uint32_t* next_event = NO_EVENT;   // NO_EVENT is just 0.. 
-static uint16_t next_event_time = 0;      // Used for telling sequencer_interrupt when next event should be triggered 
+static uint32_t next_event_time = 0;      // Used for telling sequencer_update when next event should be triggered 
 
 
 /** 
  * This is the function we should call to start playing a sequence.
  */
-void trigger_sequence(const uint32_t* seq_to_play) {
+void sequencer_start(const uint32_t* seq_to_play) {
     // Don't trigger a new sequence if one already exists
     if (next_event)
         return;
     next_event = (uint32_t*) seq_to_play;
 }
 
+/* This */
+void sequencer_stop(){
+    // TODO here:
+    //  - Set 'next_event = NO_EVENT'. That way the sequencer won't play even if the clock is active
+    //  - Disable the sequencer time interrupts. Guess we save some energy on that?
+    next_event = NO_EVENT;
+}
 
 /** 
  * Call this function from the sequence timer interrupt handler
  */
-void sequencer_interrupt(){
+void sequencer_update(){
     // TODO: Is all this dereferencing better than just storing the next event in a variable? Does it matter?
     // SEQ_TERMINATOR is 0, so we don't have to write  *next_event != SEQ_TERMINATOR, but you can think about it that way
-    if (next_event && seq_counter >= next_event_time) {
+    if (next_event && *TIMER_SEQ_CNT >= next_event_time) {
             // ^ TODO: if possible, we should set up an interrupt at specific timer counter value, 
             // so that we don't have to check each sequencer interrupt? Not sure if possible. */
         /* New event, trigger a generator */
         char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
         uint32_t inst = (*next_event >> INST_POS) & INST_MASK;
         uint32_t freq = (*next_event >> FREQ_POS) & FREQ_MASK;
-        set_gen_freq(inst, freq);
+        set_gen_freq(inst, freq);   // Why not just include a frequency parameter in the generator_start?
         // If the event is a 'note on' event:
         if (*next_event & TYPE_MASK) {
-            start_generator(inst);
+            generator_start(inst);
         } else {
-            stop_generator(inst);
+            generator_stop(inst);
         }
         // If next event is not a 0 terminator:
         if (*(++next_event)) {
             uint32_t time = (*next_event) >> TIME_POS & TIME_MASK; // (float)SEQ_CLOCK_HZ;
-            next_event_time = (seq_counter + time) % MAXVAL16;
-            print_event2(sim_counter, seq_counter, inst, type, time, freq);
+            next_event_time = (*TIMER_SEQ_CNT + time) % MAXVAL16;
+            #ifdef _SHOWCASE_H_
+            print_event(sim_counter, *TIMER_SEQ_CNT, inst, type, time, freq);
+            #endif
         } else {
             // If next event is a 0 terminator, we've reached the end of the sequence 
-            next_event = NO_EVENT;
+            sequencer_stop();
         }
     } 
     // Also, we might just turn the entire clock off when not in use (sequencer not playing), 

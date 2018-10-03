@@ -35,17 +35,24 @@
 #define _SOUND_H_
 /****************************/
 
+extern const uint32_t seq[];        // Our sequence is defined in seqs.c (hard coded)
+void generator_setup();             // Not really necessary to make a function for this :v
 
-/***** Functions *****/
-void generator_setup();
-void set_gen_freq(uint32_t generator, uint32_t frequency);
-void start_generator(uint32_t generator);
-void stop_generator(uint32_t generator);
-void audio_interrupt();
-void trigger_sequence(const uint32_t* seq_to_play);
-void sequencer_interrupt();
+/* Used for testing the generators from the main file*/
+void set_gen_freq(uint32_t generator, uint32_t frequency);  
 
-extern const uint32_t seq[];
+/* The generator functions should only be used by functions in sound.c for the final
+ * program, but can be used together with set_gen_freq() for testing the generators */
+void generator_start(uint32_t generator);
+void generator_stop(uint32_t generator);
+/* audio_update should be called in our audio timer interrupt handler to get the 
+ * value of the latest audio sample. */
+int16_t audio_update();   
+
+void sequencer_start(const uint32_t* seq_to_play);
+void sequencer_stop();
+void sequencer_update();
+
 //  extern because the sequence is nice to have in its own file, and it's read only.
 
 #endif
