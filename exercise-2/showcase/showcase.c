@@ -13,8 +13,6 @@ uint32_t seq_counter = 0;          // Simulates sequencer timer clock
 uint32_t aud_counter = 0;          // Simulates audio timer clock
 uint64_t cpu_counter = 0;          // Simulates the CPU clock
 uint64_t sim_counter = 0;          // For keeping track of position in the wave array
-volatile uint32_t* TIMER_AUD_CNT = &aud_counter;
-volatile uint32_t* TIMER_SEQ_CNT = &seq_counter;
 
 /** Write to WAV using libsndfile **/
 void write_wav(int16_t* wave_array, uint32_t wave_len) {
@@ -40,10 +38,6 @@ void simulation(uint32_t len_wave_file) {
         if (cpu_counter % TIMER_SEQ_TOP == 0) {
         /***** This simulates interrupts by our sequencer timer *****/
             sequencer_update();
-            // update the counter [done automatically by MCU]
-            if (++seq_counter >= MAXVAL16) {
-                seq_counter = 0;
-            }
         /************************************************************/
         }
         /***** This simulates interrupts by our audio timer *****/
@@ -51,10 +45,6 @@ void simulation(uint32_t len_wave_file) {
             if (sim_counter >= len_wave_file)
                 return; //stop simulation when we've reached the length of the wav
             wave_samples[sim_counter] = 16*audio_update(); // The '16' is just to scale from 12 to 16 bits for showcasing. 
-            // update the counters
-            if (++aud_counter >= MAXVAL16) {
-                aud_counter = 0;
-            }
             sim_counter++;
         /********************************************************/
         }

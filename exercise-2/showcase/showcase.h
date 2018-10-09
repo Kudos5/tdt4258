@@ -11,8 +11,6 @@ extern uint32_t seq_counter;          // Simulates sequencer timer clock
 extern uint32_t aud_counter;          // Simulates audio timer clock
 extern uint64_t cpu_counter;          // Simulates the CPU clock
 extern uint64_t sim_counter;          // For keeping track of position in the wave array
-extern volatile uint32_t* TIMER_AUD_CNT;
-extern volatile uint32_t* TIMER_SEQ_CNT;
 
 int16_t* wave_samples;             // Used for writing to file 
 
