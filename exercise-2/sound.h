@@ -41,6 +41,8 @@ void generator_setup();             // Not really necessary to make a function f
 
 /* The generator functions should only be used by functions in sound.c for the final
  * program, but can be used for testing the generators from the main files first. */
+enum {SAW, SQUARE, TRIANGLE};
+// enum {SQUARE, SAW, TRIANGLE};
 void generator_start(uint32_t generator, uint32_t freq);
 void generator_stop(uint32_t generator);
 /* audio_update should be called in our audio timer interrupt handler to get the 

@@ -33,31 +33,25 @@ uint16_t sawtooth_gen(uint32_t const f, uint32_t const F_s, uint32_t * const n_p
  */
 void __attribute__ ((interrupt)) TIMER1_IRQHandler()
 {
-    // Here we start the generator
-    
-	/*
-	 * TODO feed new samples to the DAC remember to clear the pending
-	 * interrupt by writing 1 to TIMER1_IFC 
-	 */
+    int const sequencer_counter_max = AUDIO_HZ/SEQ_HZ;
+    static int sequencer_counter = 0;
+    uint16_t data = (audio_update() + 0xFFF) >> 4; 
+    // uint16_t data = audio_update();
+    // static uint16_t data = 0xFFF >> 4;
+    // data = (~data) & 0xFFF;
+    *DAC0_CH1DATA = data & 0xFFF;
+    *DAC0_CH0DATA = data & 0xFFF;
 
-    // Write data to DAC
-    static uint32_t n = 0;
-    uint32_t const sawtooth_frequency = 1000;
-    uint32_t const amplitude = 0xFFF >> 4;
-    uint16_t sawtooth_data = sawtooth_gen(sawtooth_frequency, AUDIO_HZ, &n, amplitude);
-    // *DAC0_CH1DATA = ~(*DAC0_CH1DATA) & 0x00F;
-    // *DAC0_CH0DATA = ~(*DAC0_CH0DATA) & 0x00F;
-    *DAC0_CH1DATA = sawtooth_data;
-    *DAC0_CH0DATA = sawtooth_data;
-
+    if ( sequencer_counter == 0 ) {
+        sequencer_update();
+    }
+    sequencer_counter = (sequencer_counter + 1) % sequencer_counter_max;
     // clear pending interrupt
     *TIMER1_IFC |= 1;
 
+
 }
 
-void __attribute__ ((interrupt)) TIMER2_IRQHandler()
-{
-}
 void GPIO_HANDLER() {
     // Read button state
     uint16_t button_state = *GPIO_PC_DIN;
@@ -65,10 +59,22 @@ void GPIO_HANDLER() {
     *GPIO_PA_DOUT = button_state << 8;
     // If the first left button is pressed play a sound
     if ( button_state == ((~(1 << 0)) & 0xFF) ) {
-        EnableSound();
+        sequencer_start(seq);
     }
     // If the right button is pressed, stop the sound
     else if ( button_state == ((~(1 << 1)) & 0xFF) ) {
+        static int f = 1000;
+        f += 10;
+        generator_start(SQUARE, f);
+    }
+    else if ( button_state == ((~(1 << 2)) & 0xFF) ) {
+        generator_start(SAW, 500);
+    }
+    else if ( button_state == ((~(1 << 3)) & 0xFF) ) {
+        generator_start(SQUARE, 1050);
+        // generator_start(TRIANGLE, 500);
+    }
+    else if ( button_state == ((~(1 << 4)) & 0xFF) ) {
         DisableSound();
     }
     // Clear the interrupt to avoid repeating interrupts

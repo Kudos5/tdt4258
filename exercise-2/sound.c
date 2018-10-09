@@ -1,5 +1,5 @@
 #include "sound.h"
-#include "showcase.h"   // TODO : Remove after testing
+// #include "showcase.h"   // TODO : Remove after testing
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -10,7 +10,6 @@
 //
 static uint32_t GENERATORS_ON = 0;                     // Bitmask for setting which generators are active                                           
 
-enum {SAW, SQUARE, TRIANGLE};
 void square();
 void triangle();
 void sawtooth();
@@ -33,6 +32,8 @@ void generator_setup(){
     generators[SAW]      = (generator){ 0, 0, 0, 0, sawtooth };
 }
 
+volatile uint32_t TIMER_AUD_CNT;
+volatile uint32_t TIMER_SEQ_CNT;
 
 /** 
  * Update the square wave generator.
@@ -41,15 +42,15 @@ void generator_setup(){
 void square() {
     static int32_t halfway = 0;
     /* If it is time to change the waveform direction */
-    if (*TIMER_AUD_CNT == generators[SQUARE].time_for_change){     // TODO : This 'if' is common for all generators, so maybe extract it?
-        generators[SQUARE].time_for_change = (*TIMER_AUD_CNT + AUDIO_HZ /(generators[SQUARE].frequency)) % MAXVAL16; // time_for_change is one period from now
-        halfway = (*TIMER_AUD_CNT + AUDIO_HZ /(2*generators[SQUARE].frequency)) % MAXVAL16; // used to flip the wave on half periods 
+    if (TIMER_AUD_CNT == generators[SQUARE].time_for_change){     // TODO : This 'if' is common for all generators, so maybe extract it?
+        generators[SQUARE].time_for_change = (TIMER_AUD_CNT + AUDIO_HZ /(generators[SQUARE].frequency)) % MAXVAL16; // time_for_change is one period from now
+        halfway = (TIMER_AUD_CNT + AUDIO_HZ /(2*generators[SQUARE].frequency)) % MAXVAL16; // used to flip the wave on half periods 
         if (generators[SQUARE].current_value <= 0) {        // Use toggling instead (except for the initialization)
             generators[SQUARE].current_value = GEN_HIGH;      // replace with the correct velocity later. 
         } else {
             generators[SQUARE].current_value = GEN_LOW;
         }
-    } else if (*TIMER_AUD_CNT == halfway){
+    } else if (TIMER_AUD_CNT == halfway){
         /* This halfway thing is here to avoid 'off-by-1-sample' errors*/
         // In case of halfway, just flip the bit, and set halfway equal to 'whole way'
         if (generators[SQUARE].current_value <= 0) {        // Use toggling instead (except for the initialization)
@@ -63,7 +64,7 @@ void square() {
 
 void sawtooth() {
     static int16_t increment = 0;
-    if (*TIMER_AUD_CNT == generators[SAW].time_for_change){
+    if (TIMER_AUD_CNT == generators[SAW].time_for_change){
         /** Whenever we reach a time to change, we do the following:
          *  - Wrap around (or initialize) to the lowest possible value 
          *  - Update the 'time_for_change'
@@ -73,7 +74,7 @@ void sawtooth() {
          */
         int16_t period = AUDIO_HZ / generators[SAW].frequency;
         increment = GEN_RANGE / period;
-        generators[SAW].time_for_change = (*TIMER_AUD_CNT + period) % MAXVAL16; 
+        generators[SAW].time_for_change = (TIMER_AUD_CNT + period) % MAXVAL16; 
         generators[SAW].current_value = GEN_LOW;
     } else {
         /* If we haven't reached the time_to_change just keep incrementing */
@@ -91,7 +92,7 @@ void generator_start(uint32_t gen, uint32_t freq) {
      * If notes overlap in this protocol, the first note is overwritten! */
     GENERATORS_ON |= (1 << gen);   // Set the 'on' flag for the given generator
     // TODO : Start the generator 
-    generators[gen].time_for_change = *TIMER_AUD_CNT;   // Make the waveform change instantly
+    generators[gen].time_for_change = TIMER_AUD_CNT;   // Make the waveform change instantly
     generators[gen].current_value = 0;
     generators[gen].frequency = freq;
     generators[gen].GENERATOR();                        // Run the updater function immediately
@@ -107,7 +108,9 @@ void generator_stop(uint32_t gen) {
 /** 
  * Function that should be called on AUDIO_TIMER interrupts
  */
-int16_t audio_update(){
+int16_t audio_update() {
+    // Increment counter
+    TIMER_AUD_CNT = (TIMER_AUD_CNT+1) % UINT16_MAX;
     /** Tasks of this section:
      * 1. Read from gen_current_value and mix them
      * 2. Put the result of the mix into the DAC register (or the wave_samples, in the case of simulation)
@@ -117,12 +120,13 @@ int16_t audio_update(){
     /* update the gen_current_value */
     int16_t new_sample = 0;
     for (int gen = 0; gen < NUM_GENERATORS; gen++) {
+    // int gen = SQUARE;
         if (GENERATORS_ON & (1 << gen)) {
             generators[gen].GENERATOR(); 
             new_sample += generators[gen].current_value;
         }
     }
-    return new_sample;
+    return new_sample >> 2;
 }
 
 
@@ -159,9 +163,10 @@ void sequencer_stop(){
  * Call this function from the sequence timer interrupt handler
  */
 void sequencer_update(){
+    TIMER_SEQ_CNT = (TIMER_SEQ_CNT + 1) % UINT16_MAX;
     // TODO: Is all this dereferencing better than just storing the next event in a variable? Does it matter?
     // SEQ_TERMINATOR is 0, so we don't have to write  *next_event != SEQ_TERMINATOR, but you can think about it that way
-    if (next_event && *TIMER_SEQ_CNT >= next_event_time) {
+    if (next_event && TIMER_SEQ_CNT >= next_event_time) {
             // ^ TODO: if possible, we should set up an interrupt at specific timer counter value, 
             // so that we don't have to check each sequencer interrupt? Not sure if possible. */
         /* New event, trigger a generator */
@@ -177,9 +182,9 @@ void sequencer_update(){
         // If next event is not a 0 terminator:
         if (*(++next_event)) {
             uint32_t time = (*next_event) >> TIME_POS & TIME_MASK; // (float)SEQ_CLOCK_HZ;
-            next_event_time = (*TIMER_SEQ_CNT + time) % MAXVAL16;
+            next_event_time = (TIMER_SEQ_CNT + time) % MAXVAL16;
             #ifdef _SHOWCASE_H_
-            print_event(sim_counter, *TIMER_SEQ_CNT, inst, type, time, freq);
+            print_event(sim_counter, TIMER_SEQ_CNT, inst, type, time, freq);
             #endif
         } else {
             // If next event is a 0 terminator, we've reached the end of the sequence 

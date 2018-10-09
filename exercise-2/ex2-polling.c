@@ -28,6 +28,8 @@ void setupNVIC();
 void PollButtons();
 void EnableSound();
 void DisableSound();
+void SetupGenerators();
+void SetupSequencer();
 
 /*
  * Your code will start executing here 
@@ -42,7 +44,10 @@ int main(void)
     // NOTE: Sine generation does not work yet
     // enableDACSineGenerationMode();
 	setupTimer(SAMPLE_PERIOD_CYCLES);
+    generator_setup();
 
+    // Enable timer interrupt generation
+    *TIMER1_IEN |= 1;
 	/*
 	 * Enable interrupt handling 
 	 */
@@ -77,12 +82,17 @@ void PollButtons() {
 
 void EnableSound() {
     // Enable timer interrupt generation
-    *TIMER1_IEN |= 1;
+    // *TIMER1_IEN |= 1;
+    // generator_start(SQUARE, 500);
+    // generator_start(SAW, 666);
 }
 
 void DisableSound() {
     // Disable timer interrupt generation
-    *TIMER1_IEN &= ~(1 << 0);
+    // *TIMER1_IEN &= ~(1 << 0);
+    generator_stop(SQUARE);
+    generator_stop(SAW);
+    sequencer_stop(seq);
 }
 
 void setupNVIC()
@@ -124,3 +134,7 @@ void setupNVIC()
  * MSC_IRQHandler AES_IRQHandler EBI_IRQHandler EMU_IRQHandler 
  */
 
+void SetupGenerators() {
+}
+void SetupSequencer() {
+}
