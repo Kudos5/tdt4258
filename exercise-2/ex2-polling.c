@@ -2,6 +2,7 @@
 #include <stdbool.h>
 
 #include "efm32gg.h"
+#include "sound.h"
 
 /*
  * TODO calculate the appropriate sample period for the sound wave(s) you 
@@ -11,7 +12,8 @@
  */
 
 // The sampling frequency in Hz
-#define     SAMPLING_FREQUENCY 2000
+// #define     SAMPLING_FREQUENCY 2000
+#define     SAMPLING_FREQUENCY AUDIO_HZ
 // The period between sound samples, in clock cycles 
 #define   SAMPLE_PERIOD_CYCLES (F_HFRCO/SAMPLING_FREQUENCY)
 
