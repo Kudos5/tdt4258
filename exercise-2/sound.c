@@ -1,5 +1,8 @@
 #include "sound.h"
-#include "showcase.h"   // TODO : Remove after testing
+
+#ifdef SHOWCASE
+#include "showcase.h"
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -135,7 +138,6 @@ void sequencer_update(){
             // ^ TODO: if possible, we should set up an interrupt at specific timer counter value, 
             // so that we don't have to check each sequencer interrupt? Not sure if possible. */
         /* New event, trigger a generator */
-        char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
         uint32_t inst = (*next_event >> INST_POS) & INST_MASK;
         uint32_t freq = (*next_event >> FREQ_POS) & FREQ_MASK;
         // If the event is a 'note on' event:
@@ -148,7 +150,8 @@ void sequencer_update(){
         if (*(++next_event)) {
             uint32_t time = (*next_event) >> TIME_POS & TIME_MASK; // (float)SEQ_CLOCK_HZ;
             next_event_time = (TIMER_SEQ_CNT + time) % MAXVAL16;
-            #ifdef _SHOWCASE_H_
+            #ifdef SHOWCASE
+            char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
             print_event(sim_counter, TIMER_SEQ_CNT, inst, type, time, freq);
             #endif
         } else {

@@ -1,6 +1,5 @@
 /**
  * Demonstrates the general sequencer idea and how parts of it could be implemented
- * Build by running    `gcc -o seq sequencer.c`
  */
 #include <stdio.h>
 #include <sndfile.h>
