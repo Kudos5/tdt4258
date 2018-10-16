@@ -57,6 +57,8 @@ void modsquare() {
 
 void sawtooth() {
     int32_t new_val = (generators[SAW].position_in_cycles % AUDIO_HZ) * GEN_HIGH / AUDIO_HZ;
+    // Scale and move value so that it is between -2048,2047
+    new_val = 2*(new_val - GEN_HIGH/2);
     generators[SAW].current_value = new_val;
     generators[SAW].position_in_cycles += generators[SAW].frequency;
 }
