@@ -13,7 +13,7 @@
 //
 static uint32_t GENERATORS_ON = 0;                     // Flags for setting which generators are active
 
-void square();
+void modsquare();
 void sawtooth();
 void wavetable();
 void noise();
@@ -31,8 +31,8 @@ static generator generators[NUM_GENERATORS];
 void generator_setup(){
     // Have to cast to 'generator' type, apparently (https://stackoverflow.com/a/27052438):
     generators[SAW]      = (generator){ 0, 0, 0, sawtooth };
-    generators[SQUARE]   = (generator){ 0, 0, 0, square };
-    generators[NOISE]       = (generator){ 0, 0, 0, noise };
+    generators[SQUARE]   = (generator){ 0, 0, 0, modsquare };
+    generators[NOISE]    = (generator){ 0, 0, 0, noise };
     generators[WT]       = (generator){ 0, 0, 0, wavetable };
 }
 
@@ -43,10 +43,16 @@ volatile uint32_t TIMER_SEQ_CNT;
  * Update the square wave generator.
  * TODO : Find out whether 2's complement or not. All the generators depend on it.
  */
-void square() {
+
+static uint32_t orgfreq = 0;
+void modsquare() {
+    static uint32_t modfreq = 18;
+    static uint32_t modpic = 0;
     int32_t new_val = (generators[SQUARE].position_in_cycles % AUDIO_HZ < AUDIO_HZ/2) ? GEN_HIGH : GEN_LOW;
     generators[SQUARE].current_value = new_val;
     generators[SQUARE].position_in_cycles += generators[SQUARE].frequency;
+    generators[SQUARE].frequency = (modpic % AUDIO_HZ < AUDIO_HZ/2) ? orgfreq : 2*orgfreq;
+    modpic += modfreq;
 }
 
 void sawtooth() {
@@ -81,6 +87,7 @@ void generator_start(uint32_t gen, uint32_t freq) {
     // TODO : Start the generator 
     generators[gen].current_value = 0;
     generators[gen].frequency = freq;
+    orgfreq = freq;
     generators[gen].GENERATOR();                        // Run the updater function immediately
 }
 
