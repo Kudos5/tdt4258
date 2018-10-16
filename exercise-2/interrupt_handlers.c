@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include "math.h"
 
 #include "sound.h"
 #include "efm32gg.h"
@@ -31,8 +32,7 @@ uint16_t sawtooth_gen(uint32_t const f, uint32_t const F_s, uint32_t * const n_p
 /*
  * TIMER1 interrupt handler 
  */
-void __attribute__ ((interrupt)) TIMER1_IRQHandler()
-{
+void __attribute__ ((interrupt)) TIMER1_IRQHandler() {
     int const sequencer_counter_max = AUDIO_HZ/SEQ_HZ;
     static int sequencer_counter = 0;
     uint16_t data = (audio_update() + 0xFFF) >> 4; 
@@ -63,16 +63,14 @@ void GPIO_HANDLER() {
     }
     // If the right button is pressed, stop the sound
     else if ( button_state == ((~(1 << 1)) & 0xFF) ) {
-        static int f = 1000;
-        f += 10;
-        generator_start(SQUARE, f);
+        sequencer_start(seq2);
     }
     else if ( button_state == ((~(1 << 2)) & 0xFF) ) {
-        generator_start(SAW, 500);
+        generate_sweep(WT, 4000, 0, 4000);
     }
     else if ( button_state == ((~(1 << 3)) & 0xFF) ) {
-        generator_start(SQUARE, 1050);
-        // generator_start(TRIANGLE, 500);
+        // sequencer_start(seq4);
+        generate_sweep(NOISE, 4000, 0, 4000);
     }
     else if ( button_state == ((~(1 << 4)) & 0xFF) ) {
         DisableSound();

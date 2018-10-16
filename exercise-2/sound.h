@@ -32,6 +32,7 @@
 #define TIMER_AUDIO_TOP (CPU_CLOcK_HZ / AUDIO_HZ)
 #define TIMER_SEQ_TOP   (CPU_CLOcK_HZ / SEQ_HZ)
 #define WT_SIZE 32
+#define WT_NOISE_SIZE 128
 #ifndef _SOUND_H_
 #define _SOUND_H_
 /****************************/
@@ -42,6 +43,7 @@ extern const uint32_t seq2[];
 extern const uint32_t seq3[];
 extern const uint32_t seq4[];
 extern const int16_t WAVETABLE[];   // We also hard code a wave table
+extern const int16_t WAVETABLE_NOISE[];
 void generator_setup();             // Not really necessary to make a function for this :v
 
 /* The generator functions should only be used by functions in sound.c for the final

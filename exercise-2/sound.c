@@ -55,15 +55,18 @@ void sawtooth() {
     generators[SAW].position_in_cycles += generators[SAW].frequency;
 }
 
-void noise() {
-    return;
-}
-
 void wavetable() {
     uint32_t phasor = (generators[WT].position_in_cycles % AUDIO_HZ) * (WT_SIZE-1) / AUDIO_HZ;
     int16_t new_val = WAVETABLE[phasor];
     generators[WT].current_value = new_val;
     generators[WT].position_in_cycles += generators[WT].frequency;
+}
+
+void noise() {
+    uint32_t phasor = (generators[NOISE].position_in_cycles % AUDIO_HZ) * (WT_NOISE_SIZE-1) / AUDIO_HZ;
+    int16_t new_val = WAVETABLE_NOISE[phasor];
+    generators[NOISE].current_value = new_val;
+    generators[NOISE].position_in_cycles += generators[NOISE].frequency;
 }
 
 void generator_set_frequency(uint32_t gen, uint32_t current_freq_scaled, uint32_t scaling){
