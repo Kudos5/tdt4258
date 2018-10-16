@@ -28,14 +28,15 @@ void write_wav(int16_t* wave_array, uint32_t wave_len) {
     sf_close(ofile);
 }
 
-void simulation(uint32_t len_wave_file, char* sim_mode) {
+
+void simulation(uint32_t len_wave_file, char* sim_mode, uint32_t fstart, uint32_t fend) {
     /** 
      * Function that simulates the execution on MCU 
      */
     if (!strcmp(sim_mode, "")) {
         sequencer_start(seq);
     } else {
-        //sweep()
+        generate_sweep(SAW, len_wave_file, fstart, fend);
     }
     for (cpu_counter = 0; cpu_counter < MAXVAL32; cpu_counter++) {
         if (cpu_counter % TIMER_SEQ_TOP == 0) {
@@ -72,7 +73,6 @@ void simulation(uint32_t len_wave_file, char* sim_mode) {
      */
 
 
-// SHOWCASE STUFF. Move to its own h-file
 void print_event(uint64_t simc, uint16_t seqc, uint32_t in, char* ty, uint32_t ti, uint32_t fre){
     printf("sim_ctr: %"PRId64"\t seq_ctr:%"PRId16"\tinst #%d %s, time_diff=%d, freq=%d \n", 
         simc, seqc, in, ty, ti, fre);
@@ -86,29 +86,29 @@ void empty_wave(uint32_t length){
     }
 }
 
+
 int main(int argv, char **argc)
 {
     char* sim_mode;
-    if (argv > 1) {
-        sim_mode = argc[1];
-    } else {
-        sim_mode = "";
-    }
     generator_setup();
 	uint32_t *current_event = NO_EVENT;
   	//showcase_sequence(seq, current_event);
     
     uint32_t length_of_wav = AUDIO_HZ*30;
-    if (argv > 1) {
-        printf("%d\n",atoi(argc[1]));
+    uint32_t freq_s = 220;
+    uint32_t freq_e = 440;
+    if (argv == 1) {
+        sim_mode = "\0";
+    } else {
         length_of_wav = atoi(argc[1]);
+        sim_mode = "sweep\0";
+    }
+    if (argv > 3) {
+        freq_s = atoi(argc[2]);
+        freq_e = atoi(argc[3]);
     }
     empty_wave(length_of_wav);
-    simulation(length_of_wav, sim_mode);
-    /* Don't do this unless you want to wait
-    for (int i = 0; i < length_of_wav; i++){
-        printf("snd[%d] = %d\n", i, wave_samples[i]);
-    }*/
+    simulation(length_of_wav, sim_mode, freq_s, freq_e);
     write_wav(wave_samples, length_of_wav);
     printf("Wrote data to 'simulation.wav'\n");
     free(wave_samples);

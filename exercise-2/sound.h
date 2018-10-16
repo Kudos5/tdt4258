@@ -50,6 +50,7 @@ void generator_stop(uint32_t generator);
 /* audio_update should be called in our audio timer interrupt handler to get the 
  * value of the latest audio sample. */
 int16_t audio_update();   
+void generate_sweep(uint32_t gen, uint32_t num_samples_in_sweep, uint32_t fstart, uint32_t fend);
 
 void sequencer_start(const uint32_t* seq_to_play);
 void sequencer_stop();
