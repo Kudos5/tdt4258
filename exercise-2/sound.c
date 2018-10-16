@@ -1,5 +1,8 @@
 #include "sound.h"
-#include "showcase.h"   // TODO : Remove after testing
+
+#ifdef SHOWCASE
+#include "showcase.h"
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -8,11 +11,12 @@
 // 
 ///////////////////////////////////////////////////////////////////////////////
 //
-static uint32_t GENERATORS_ON = 0;                     // Bitmask for setting which generators are active                                           
+static uint32_t GENERATORS_ON = 0;                     // Flags for setting which generators are active
 
 void square();
 void triangle();
 void sawtooth();
+void wavetable();
 typedef struct gen_struct {
     uint32_t position_in_cycles;    // Inspired by Audacity source code
     uint32_t frequency;             // Current frequency of the generator
@@ -29,6 +33,7 @@ void generator_setup(){
     generators[TRIANGLE] = (generator){ 0, 0, 0, triangle };
     generators[SQUARE]   = (generator){ 0, 0, 0, square };
     generators[SAW]      = (generator){ 0, 0, 0, sawtooth };
+    generators[WT]       = (generator){ 0, 0, 0, wavetable };
 }
 
 volatile uint32_t TIMER_AUD_CNT;
@@ -53,6 +58,14 @@ void sawtooth() {
 void triangle() {
     return;
 }
+
+void wavetable() {
+    uint32_t phasor = (generators[WT].position_in_cycles % AUDIO_HZ) * (WT_SIZE-1) / AUDIO_HZ;
+    int16_t new_val = WAVETABLE[phasor];
+    generators[WT].current_value = new_val;
+    generators[WT].position_in_cycles += generators[WT].frequency;
+}
+
 
 // To run on note ons
 void generator_start(uint32_t gen, uint32_t freq) {
@@ -135,7 +148,6 @@ void sequencer_update(){
             // ^ TODO: if possible, we should set up an interrupt at specific timer counter value, 
             // so that we don't have to check each sequencer interrupt? Not sure if possible. */
         /* New event, trigger a generator */
-        char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
         uint32_t inst = (*next_event >> INST_POS) & INST_MASK;
         uint32_t freq = (*next_event >> FREQ_POS) & FREQ_MASK;
         // If the event is a 'note on' event:
@@ -148,7 +160,8 @@ void sequencer_update(){
         if (*(++next_event)) {
             uint32_t time = (*next_event) >> TIME_POS & TIME_MASK; // (float)SEQ_CLOCK_HZ;
             next_event_time = (TIMER_SEQ_CNT + time) % MAXVAL16;
-            #ifdef _SHOWCASE_H_
+            #ifdef SHOWCASE
+            char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
             print_event(sim_counter, TIMER_SEQ_CNT, inst, type, time, freq);
             #endif
         } else {
