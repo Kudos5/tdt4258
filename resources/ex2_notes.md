@@ -31,4 +31,16 @@ New knowledge
 - [Source with examples](https://stackoverflow.com/questions/572547/what-does-static-mean-in-c)
 
 
-
+### Bit fields
+[Bit fields](https://en.wikipedia.org/wiki/Bit_field#C_programming_language),
+are useful for making structs smaller. Instead of using an entire uint for each
+variable, you can tell the compiler to use the specified amount of bits:
+```c
+struct {
+    unsigned member1 : 10;   /* defines variable with 10 bits */
+    unsigned member2 : 20;   
+    unsigned member3 : 2;   
+}
+```
+I am not sure how it works internally, maybe the compiler just transforms bit
+fields into combinations of masking and bitwise operations?
