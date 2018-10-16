@@ -46,14 +46,17 @@ void generator_setup();             // Not really necessary to make a function f
 
 /* The generator functions should only be used by functions in sound.c for the final
  * program, but can be used for testing the generators from the main files first. */
-enum {SAW, SQUARE, TRIANGLE, WT};
+enum {SAW, SQUARE, NOISE, WT};
 // enum {SQUARE, SAW, TRIANGLE};
+void generator_set_frequency(uint32_t gen, uint32_t current_freq_scaled, uint32_t scaling);
 void generator_start(uint32_t generator, uint32_t freq);
 void generator_stop(uint32_t generator);
 /* audio_update should be called in our audio timer interrupt handler to get the 
  * value of the latest audio sample. */
 int16_t audio_update();   
+
 void generate_sweep(uint32_t gen, uint32_t num_samples_in_sweep, uint32_t fstart, uint32_t fend);
+void sweep();
 
 void sequencer_start(const uint32_t* seq_to_play);
 void sequencer_stop();

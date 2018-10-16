@@ -3,7 +3,7 @@ EXEC = showcase
 CFLAGS=-ggdb -Wall
 
 DEPS = sound.h 
-OBJ = showcase.c sound.c seqs.c 
+OBJ = showcase.c sound.c seqs.c sweep.c
 
 LIBS = -lsndfile -lm 
 
