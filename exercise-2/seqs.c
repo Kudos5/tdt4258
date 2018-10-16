@@ -254,3 +254,21 @@ const uint32_t seq[] = {
     0x0092d0f0,
     SEQ_TERMINATOR
 };
+
+const uint32_t seq2[] = {
+    0x00208001,
+    0x00208144,
+    SEQ_TERMINATOR
+};
+
+const uint32_t seq3[] = {
+    0x00248001,
+    0x00248144,
+    SEQ_TERMINATOR
+};
+
+const uint32_t seq4[] = {
+    0x00290001,
+    0x00290144,
+    SEQ_TERMINATOR
+};

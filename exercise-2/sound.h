@@ -38,6 +38,9 @@
 
 //  extern because the sequence is nice to have in its own file, and it's read only.
 extern const uint32_t seq[];        // Our sequence is defined in seqs.c (hard coded)
+extern const uint32_t seq2[];
+extern const uint32_t seq3[];
+extern const uint32_t seq4[];
 extern const int16_t WAVETABLE[];   // We also hard code a wave table
 void generator_setup();             // Not really necessary to make a function for this :v
 
