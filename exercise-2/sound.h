@@ -37,6 +37,9 @@
 
 //  extern because the sequence is nice to have in its own file, and it's read only.
 extern const uint32_t seq[];        // Our sequence is defined in seqs.c (hard coded)
+extern const uint32_t seq2[];
+extern const uint32_t seq3[];
+extern const uint32_t seq4[];
 void generator_setup();             // Not really necessary to make a function for this :v
 
 /* The generator functions should only be used by functions in sound.c for the final
