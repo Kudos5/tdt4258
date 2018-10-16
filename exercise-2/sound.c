@@ -11,11 +11,12 @@
 // 
 ///////////////////////////////////////////////////////////////////////////////
 //
-static uint32_t GENERATORS_ON = 0;                     // Bitmask for setting which generators are active                                           
+static uint32_t GENERATORS_ON = 0;                     // Flags for setting which generators are active
 
 void square();
 void triangle();
 void sawtooth();
+void wavetable();
 typedef struct gen_struct {
     uint32_t position_in_cycles;    // Inspired by Audacity source code
     uint32_t frequency;             // Current frequency of the generator
@@ -32,6 +33,7 @@ void generator_setup(){
     generators[TRIANGLE] = (generator){ 0, 0, 0, triangle };
     generators[SQUARE]   = (generator){ 0, 0, 0, square };
     generators[SAW]      = (generator){ 0, 0, 0, sawtooth };
+    generators[WT]       = (generator){ 0, 0, 0, wavetable };
 }
 
 volatile uint32_t TIMER_AUD_CNT;
@@ -56,6 +58,14 @@ void sawtooth() {
 void triangle() {
     return;
 }
+
+void wavetable() {
+    uint32_t phasor = (generators[WT].position_in_cycles % AUDIO_HZ) * (WT_SIZE-1) / AUDIO_HZ;
+    int16_t new_val = WAVETABLE[phasor];
+    generators[WT].current_value = new_val;
+    generators[WT].position_in_cycles += generators[WT].frequency;
+}
+
 
 // To run on note ons
 void generator_start(uint32_t gen, uint32_t freq) {

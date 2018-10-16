@@ -31,17 +31,19 @@
 #define SEQ_HZ 1000
 #define TIMER_AUDIO_TOP (CPU_CLOcK_HZ / AUDIO_HZ)
 #define TIMER_SEQ_TOP   (CPU_CLOcK_HZ / SEQ_HZ)
+#define WT_SIZE 32
 #ifndef _SOUND_H_
 #define _SOUND_H_
 /****************************/
 
 //  extern because the sequence is nice to have in its own file, and it's read only.
 extern const uint32_t seq[];        // Our sequence is defined in seqs.c (hard coded)
+extern const int16_t WAVETABLE[];   // We also hard code a wave table
 void generator_setup();             // Not really necessary to make a function for this :v
 
 /* The generator functions should only be used by functions in sound.c for the final
  * program, but can be used for testing the generators from the main files first. */
-enum {SAW, SQUARE, TRIANGLE};
+enum {SAW, SQUARE, TRIANGLE, WT};
 // enum {SQUARE, SAW, TRIANGLE};
 void generator_start(uint32_t generator, uint32_t freq);
 void generator_stop(uint32_t generator);

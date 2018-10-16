@@ -1,7 +1,39 @@
 #include "sound.h"
 
-/* TODO : Something is either wrong with this sequence or with the square generator.
- * Find out which when stuff kind of works on the board.  */
+const int16_t WAVETABLE [] = {
+    0,
+    399,
+    783,
+    1137,
+    1447,
+    1702,
+    1891,
+    2007,
+    2047,
+    2007,
+    1891,
+    1702,
+    1447,
+    1137,
+    783,
+    399,
+    0,
+    -399,
+    -783,
+    -1137,
+    -1447,
+    -1702,
+    -1891,
+    -2007,
+    -2047,
+    -2007,
+    -1891,
+    -1702,
+    -1447,
+    -1137,
+    -783,
+    -399,
+};
 
 const uint32_t seq[] = {
     0x00208001,

@@ -1,5 +1,5 @@
 CC=gcc # What compiler to use
-EXEC = seq
+EXEC = showcase
 CFLAGS=-ggdb -Wall
 
 DEPS = sound.h 

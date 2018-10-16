@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <sndfile.h>
 #include <stdlib.h>
+#include <string.h>
 #include "sound.h"
 #include "showcase.h"
 
@@ -27,12 +28,15 @@ void write_wav(int16_t* wave_array, uint32_t wave_len) {
     sf_close(ofile);
 }
 
-
-void simulation(uint32_t len_wave_file) {
+void simulation(uint32_t len_wave_file, char* sim_mode) {
     /** 
      * Function that simulates the execution on MCU 
      */
-    sequencer_start(seq);
+    if (!strcmp(sim_mode, "")) {
+        sequencer_start(seq);
+    } else {
+        //sweep()
+    }
     for (cpu_counter = 0; cpu_counter < MAXVAL32; cpu_counter++) {
         if (cpu_counter % TIMER_SEQ_TOP == 0) {
         /***** This simulates interrupts by our sequencer timer *****/
@@ -84,7 +88,12 @@ void empty_wave(uint32_t length){
 
 int main(int argv, char **argc)
 {
-
+    char* sim_mode;
+    if (argv > 1) {
+        sim_mode = argc[1];
+    } else {
+        sim_mode = "";
+    }
     generator_setup();
 	uint32_t *current_event = NO_EVENT;
   	//showcase_sequence(seq, current_event);
@@ -95,11 +104,13 @@ int main(int argv, char **argc)
         length_of_wav = atoi(argc[1]);
     }
     empty_wave(length_of_wav);
-    simulation(length_of_wav);
+    simulation(length_of_wav, sim_mode);
+    /* Don't do this unless you want to wait
     for (int i = 0; i < length_of_wav; i++){
         printf("snd[%d] = %d\n", i, wave_samples[i]);
-    }
+    }*/
     write_wav(wave_samples, length_of_wav);
+    printf("Wrote data to 'simulation.wav'\n");
     free(wave_samples);
 
 	return 0;
