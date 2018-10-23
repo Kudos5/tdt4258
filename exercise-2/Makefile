@@ -1,5 +1,5 @@
 
-PROGRAMS = ex2-polling.bin ex2-interrupt.bin ex2-dma.bin
+PROGRAMS = ex2-polling.bin ex2-interrupt.bin
 
 CC=arm-none-eabi-gcc
 LD=arm-none-eabi-gcc
@@ -9,7 +9,7 @@ CFLAGS=-mcpu=cortex-m3 -mthumb -g -std=c99 -Wall -Wextra -Wpedantic
 LDFLAGS=-mcpu=cortex-m3 -mthumb -g -lgcc -lc -lcs3 -lcs3unhosted -lefm32gg -Llib
 ASFLAGS=-mcpu=cortex-m3 -mthumb -g
 LINKERSCRIPT=lib/efm32gg.ld
-OBJ=dac.o gpio.o timer.o interrupt_handlers.o sound.o seqs.o
+OBJ=dac.o gpio.o timer.o interrupt_handlers.o sound.o seqs.o sweep.o
 
 
 # Prevent removing intermediate elf and object files
@@ -39,10 +39,6 @@ upload_polling :
 .PHONY : upload_interrupt
 upload_interrupt :
 	-eACommander.sh -r --address 0x00000000 -f "ex2-interrupt.bin" -r
-
-.PHONY : upload_dma
-upload_dma :
-	-eACommander.sh -r --address 0x00000000 -f "ex2-dma.bin" -r
 
 .PHONY : clean
 clean :
