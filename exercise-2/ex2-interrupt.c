@@ -25,7 +25,6 @@ void setupTimer(uint32_t period);
 void setupDAC();
 void enableDACSineGenerationMode();
 void setupNVIC();
-void EnableSound();
 void DisableSound();
 void SetupGenerators();
 void SetupSequencer();
@@ -59,13 +58,6 @@ int main(void)
 	while (1) ;
 
 	return 0;
-}
-
-void EnableSound() {
-    // Enable timer interrupt generation
-    // *TIMER1_IEN |= 1;
-    // generator_start(SQUARE, 500);
-    // generator_start(SAW, 666);
 }
 
 void setupNVIC()

@@ -26,7 +26,6 @@ void setupDAC();
 void enableDACSineGenerationMode();
 void setupNVIC();
 void PollButtons();
-void EnableSound();
 void DisableSound();
 void SetupGenerators();
 void SetupSequencer();
@@ -69,12 +68,5 @@ void PollButtons() {
             DisableSound();
         }
     }
-}
-
-void EnableSound() {
-    // Enable timer interrupt generation
-    // *TIMER1_IEN |= 1;
-    // generator_start(SQUARE, 500);
-    // generator_start(SAW, 666);
 }
 
