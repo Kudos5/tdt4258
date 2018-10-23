@@ -92,7 +92,9 @@ void DisableSound() {
     // *TIMER1_IEN &= ~(1 << 0);
     generator_stop(SQUARE);
     generator_stop(SAW);
-    sequencer_stop(seq);
+    generator_stop(WT);
+    generator_stop(NOISE);
+    sequencer_stop();
 }
 
 void setupNVIC()
