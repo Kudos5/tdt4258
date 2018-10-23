@@ -59,17 +59,21 @@ void GPIO_HANDLER() {
     *GPIO_PA_DOUT = button_state << 8;
     // If the first left button is pressed play a sound
     if ( button_state == ((~(1 << 0)) & 0xFF) ) {
+        DisableSound();
         sequencer_start(seq);
     }
     // If the right button is pressed, stop the sound
     else if ( button_state == ((~(1 << 1)) & 0xFF) ) {
+        DisableSound();
         sequencer_start(seq2);
     }
     else if ( button_state == ((~(1 << 2)) & 0xFF) ) {
+        DisableSound();
         generate_sweep(WT, 4000, 0, 4000);
     }
     else if ( button_state == ((~(1 << 3)) & 0xFF) ) {
         // sequencer_start(seq4);
+        DisableSound();
         generate_sweep(NOISE, 4000, 0, 4000);
     }
     else if ( button_state == ((~(1 << 4)) & 0xFF) ) {
