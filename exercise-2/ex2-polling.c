@@ -87,16 +87,6 @@ void EnableSound() {
     // generator_start(SAW, 666);
 }
 
-void DisableSound() {
-    // Disable timer interrupt generation
-    // *TIMER1_IEN &= ~(1 << 0);
-    generator_stop(SQUARE);
-    generator_stop(SAW);
-    generator_stop(WT);
-    generator_stop(NOISE);
-    sequencer_stop();
-}
-
 void setupNVIC()
 {
 	/*

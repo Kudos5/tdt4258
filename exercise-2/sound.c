@@ -185,3 +185,15 @@ void sequencer_update(){
 // General TODO : Add the following for easily setting and clearing single bits:
 //      #define SET(x,y) (x|=(1<<y))
 //      #define CLR(x,y) (x&=(~(1<<y)))
+
+
+void DisableSound() {
+    // Disable timer interrupt generation
+    // *TIMER1_IEN &= ~(1 << 0);
+    generator_stop(SQUARE);
+    generator_stop(SAW);
+    generator_stop(WT);
+    generator_stop(NOISE);
+    sequencer_stop();
+}
+

@@ -64,6 +64,8 @@ void sequencer_start(const uint32_t* seq_to_play);
 void sequencer_stop();
 void sequencer_update();
 
+// Stop all generators and the sequencer
+void DisableSound();
 
 #endif
 
