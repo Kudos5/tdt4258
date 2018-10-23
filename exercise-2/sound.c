@@ -25,11 +25,12 @@ typedef struct gen_struct {
 } generator; 
 static generator generators[NUM_GENERATORS];
 
+
 /** Initialize the generator structures. 
  * Do *not* forget to call this on reset. 
  */
 void generator_setup(){
-    // Have to cast to 'generator' type, apparently (https://stackoverflow.com/a/27052438):
+    /* Have to cast to 'generator' type, apparently (https://stackoverflow.com/a/27052438) */
     generators[SAW]      = (generator){ 0, 0, 0, sawtooth };
     generators[SQUARE]   = (generator){ 0, 0, 0, modsquare };
     generators[NOISE]    = (generator){ 0, 0, 0, noise };
@@ -39,14 +40,10 @@ void generator_setup(){
 volatile uint32_t TIMER_AUD_CNT;
 volatile uint32_t TIMER_SEQ_CNT;
 
-/** 
- * Update the square wave generator.
- * TODO : Find out whether 2's complement or not. All the generators depend on it.
- */
-
+/********** Generator update functions **********/
 static uint32_t orgfreq = 0;
 void modsquare() {
-    static uint32_t modfreq = 18;
+    static uint32_t modfreq = 18;   /* Modulate frequency for a more interesting sound */
     static uint32_t modpic = 0;
     int32_t new_val = (generators[SQUARE].position_in_cycles % AUDIO_HZ < AUDIO_HZ/2) ? GEN_HIGH : GEN_LOW;
     generators[SQUARE].current_value = new_val;
@@ -57,7 +54,7 @@ void modsquare() {
 
 void sawtooth() {
     int32_t new_val = (generators[SAW].position_in_cycles % AUDIO_HZ) * GEN_HIGH / AUDIO_HZ;
-    // Scale and move value so that it is between -2048,2047
+    /* Scale and move value so that it is between -2048,2047 */
     new_val = 2*(new_val - GEN_HIGH/2);
     generators[SAW].current_value = new_val;
     generators[SAW].position_in_cycles += generators[SAW].frequency;
@@ -76,24 +73,25 @@ void noise() {
     generators[NOISE].current_value = new_val;
     generators[NOISE].position_in_cycles += generators[NOISE].frequency;
 }
+/************************************************/
 
 void generator_set_frequency(uint32_t gen, uint32_t current_freq_scaled, uint32_t scaling){
     generators[gen].frequency = current_freq_scaled / scaling; 
 }
 
-// To run on note ons
+/** Function to run on "note on"s or to trigger one-shot sounds
+ * NOTE: Only one 'on' flag per generator => only monophonic instruments supported 
+ * If notes overlap in this protocol, the first note is overwritten! */
 void generator_start(uint32_t gen, uint32_t freq) {
-    /* NOTE: Only one 'on' flag per generator => only monophonic instruments supported 
-     * If notes overlap in this protocol, the first note is overwritten! */
     GENERATORS_ON |= (1 << gen);   // Set the 'on' flag for the given generator
-    // TODO : Start the generator 
     generators[gen].current_value = 0;
     generators[gen].frequency = freq;
     orgfreq = freq;
     generators[gen].GENERATOR();                        // Run the updater function immediately
 }
 
-// To run on note offs
+
+/** To run on note offs */
 void generator_stop(uint32_t gen) {
     GENERATORS_ON &= ~(1 << gen);   // Clear the 'on' flag for the given generator
     generators[gen].current_value = 0;
@@ -101,17 +99,13 @@ void generator_stop(uint32_t gen) {
 
 
 /** 
- * Function that should be called on AUDIO_TIMER interrupts
+ * Function that should be called on each timer interrupt.
+ * Updates the value of each active generator by calling their updater function,
+ * then adds (mixes) the new generator values together and returns the sum.
  */
 int16_t audio_update() {
     // Increment counter
-    TIMER_AUD_CNT = (TIMER_AUD_CNT+1) % UINT16_MAX;     // TODO: We can use 32 bits eventually. Not sure if needed
-    /** Tasks of this section:
-     * 1. Read from gen_current_value and mix them
-     * 2. Put the result of the mix into the DAC register (or the wave_samples, in the case of simulation)
-     * 3. Update the gen_current_value for each generator
-     */
-    /* update the gen_current_value */
+    TIMER_AUD_CNT = (TIMER_AUD_CNT+1) % UINT16_MAX;     // TODO: We could use 32 bits here. 
     int16_t new_sample = 0;
     for (int gen = 0; gen < NUM_GENERATORS; gen++) {
         if (GENERATORS_ON & (1 << gen)) {
@@ -120,7 +114,7 @@ int16_t audio_update() {
             new_sample += generators[gen].current_value;
         }
     }
-    return new_sample >> 2;
+    return new_sample >> 2;     /* Scaling to avoid distortion */
 }
 
 
@@ -130,9 +124,10 @@ int16_t audio_update() {
 // 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Define static global variables for keeping track 
-static uint32_t* next_event = NO_EVENT;   // NO_EVENT is just 0.. 
-static uint32_t next_event_time = 0;      // Used for telling sequencer_update when next event should be triggered 
+/* next_event is a pointer to the next event that should be read from a sequence */
+static uint32_t* next_event = NO_EVENT;
+/* next_event_time is Used for telling sequencer_update when next event should be triggered */
+static uint32_t next_event_time = 0;  
 
 
 /** 
@@ -158,37 +153,34 @@ void sequencer_stop(){
  */
 void sequencer_update(){
     TIMER_SEQ_CNT = (TIMER_SEQ_CNT + 1) % UINT16_MAX;
-    // TODO: Is all this dereferencing better than just storing the next event in a variable? Does it matter?
-    // SEQ_TERMINATOR is 0, so we don't have to write  *next_event != SEQ_TERMINATOR, but you can think about it that way
+    /* If it is time for the next event, trigger (on / off) a generator. 
+     * NO_EVENT is defined as 0, so we don't have to write 
+     * `next_event != NO_EVENT && ...`, but you can think about it that way */
     if (next_event && TIMER_SEQ_CNT >= next_event_time) {
-            // ^ TODO: if possible, we should set up an interrupt at specific timer counter value, 
-            // so that we don't have to check each sequencer interrupt? Not sure if possible. */
-        /* New event, trigger a generator */
         uint32_t inst = (*next_event >> INST_POS) & INST_MASK;
         uint32_t freq = (*next_event >> FREQ_POS) & FREQ_MASK;
-        // If the event is a 'note on' event:
+        /* If the event is 'note on' type */
         if (*next_event & TYPE_MASK) {
             generator_start(inst, freq);
-        } else {
+        } /* If event is a 'note off' */
+        else {
             generator_stop(inst);
         }
-        // If next event is not a 0 terminator:
+        /* SEQ_TERMINATOR is also defined as 0, so the following means 
+         * "If *next_event (after ptr incrementation) is not a SEQ_TERMINATOR..." */
         if (*(++next_event)) {
-            uint32_t time = (*next_event) >> TIME_POS & TIME_MASK; // (float)SEQ_CLOCK_HZ;
+            uint32_t time = (*next_event) >> TIME_POS & TIME_MASK;
             next_event_time = (TIMER_SEQ_CNT + time) % MAXVAL16;
             #ifdef SHOWCASE
             char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
             print_event(sim_counter, TIMER_SEQ_CNT, inst, type, time, freq);
             #endif
         } else {
-            // If next event is a 0 terminator, we've reached the end of the sequence 
+            /* If next event is a SEQ_TERMINATOR, we've reached the end of the sequence */
             sequencer_stop();
         }
     } 
-    // Also, we might just turn the entire clock off when not in use (sequencer not playing), 
-    // so that we don't have to check if an event is playing at all.
 }
-
 
 // General TODO : Add the following for easily setting and clearing single bits:
 //      #define SET(x,y) (x|=(1<<y))
