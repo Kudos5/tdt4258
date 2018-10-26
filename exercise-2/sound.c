@@ -10,8 +10,8 @@
 // Generators
 // 
 ///////////////////////////////////////////////////////////////////////////////
-//
-static uint32_t GENERATORS_ON = 0;                     // Flags for setting which generators are active
+
+static uint32_t GENERATORS_ON = 0;  /* Flags for setting which generators are active */
 
 void modsquare();
 void sawtooth();
@@ -19,9 +19,9 @@ void wavetable();
 void noise();
 typedef struct gen_struct {
     uint32_t position_in_cycles;    // Inspired by Audacity source code
-    uint32_t frequency;             // Current frequency of the generator
-    int16_t  current_value;         // This is where the output sample of each generator is set and read from
-    void (*GENERATOR)();
+    uint32_t frequency;             /* Current frequency of the generator */
+    int16_t  current_value;         /* This is where the output sample of each generator is set and read from */
+    void (*GENERATOR)();            /* Pointer to the generator update function */
 } generator; 
 static generator generators[NUM_GENERATORS];
 
@@ -40,7 +40,7 @@ void generator_setup(){
 volatile uint32_t TIMER_AUD_CNT;
 volatile uint32_t TIMER_SEQ_CNT;
 
-/********** Generator update functions **********/
+/////////// Generator update functions ///////////
 static uint32_t orgfreq = 0;
 void modsquare() {
     static uint32_t modfreq = 18;   /* Modulate frequency for a more interesting sound */
@@ -73,27 +73,33 @@ void noise() {
     generators[NOISE].current_value = new_val;
     generators[NOISE].position_in_cycles += generators[NOISE].frequency;
 }
-/************************************************/
+//////////////////////////////////////////////////
 
 void generator_set_frequency(uint32_t gen, uint32_t current_freq_scaled, uint32_t scaling){
     generators[gen].frequency = current_freq_scaled / scaling; 
 }
 
-/** Function to run on "note on"s or to trigger one-shot sounds
+/** 
+ * Function to activate a generator.
+ * To be run on "note on" type events or to trigger one-shot sounds.
  * NOTE: Only one 'on' flag per generator => only monophonic instruments supported 
- * If notes overlap in this protocol, the first note is overwritten! */
+ * If notes overlap in this protocol, the first note is overwritten! 
+ * */
 void generator_start(uint32_t gen, uint32_t freq) {
-    GENERATORS_ON |= (1 << gen);   // Set the 'on' flag for the given generator
-    generators[gen].current_value = 0;
-    generators[gen].frequency = freq;
-    orgfreq = freq;
-    generators[gen].GENERATOR();                        // Run the updater function immediately
+    GENERATORS_ON |= (1 << gen);        /* Set the 'on' flag for the given generator */
+    generators[gen].current_value = 0;  /* *(Re)set the value of of the generator */
+    generators[gen].frequency = freq;   /* Set current frequency of the generator */
+    orgfreq = freq;                     /* Only used by the modulated square generator */
+    generators[gen].GENERATOR();        /* Run the updater function immediately */
 }
 
 
-/** To run on note offs */
+/** 
+ * Function to run on "note off" events.
+ * Clears the 'on' flag for the given generator and sets its value to 0 
+ * */
 void generator_stop(uint32_t gen) {
-    GENERATORS_ON &= ~(1 << gen);   // Clear the 'on' flag for the given generator
+    GENERATORS_ON &= ~(1 << gen);
     generators[gen].current_value = 0;
 }
 
@@ -105,7 +111,7 @@ void generator_stop(uint32_t gen) {
  */
 int16_t audio_update() {
     // Increment counter
-    TIMER_AUD_CNT = (TIMER_AUD_CNT+1) % UINT16_MAX;     // TODO: We could use 32 bits here. 
+    TIMER_AUD_CNT = (TIMER_AUD_CNT+1) % UINT16_MAX;
     int16_t new_sample = 0;
     for (int gen = 0; gen < NUM_GENERATORS; gen++) {
         if (GENERATORS_ON & (1 << gen)) {
@@ -116,6 +122,10 @@ int16_t audio_update() {
     }
     return new_sample >> 2;     /* Scaling to avoid distortion */
 }
+
+// /Generators
+///////////////////////////////////////////////////////////////////////////////
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -131,31 +141,38 @@ static uint32_t next_event_time = 0;
 
 
 /** 
- * This is the function we should call to start playing a sequence.
+ * Function to start playing a sequence.
+ * Simply sets next_event to the address of the first event in a null terminated 
+ * sequence, unless another sequence is already playing (next_event != 0). 
  */
 void sequencer_start(const uint32_t* seq_to_play) {
-    // Don't trigger a new sequence if one already exists
     if (next_event)
         return;
     next_event = (uint32_t*) seq_to_play;
 }
 
-/* This */
+
+/** 
+ * Function to stop the active sequence.
+ * Simply makes next_event point to 0 (NO_EVENT) 
+ * */
 void sequencer_stop(){
-    // TODO here:
-    //  - Set 'next_event = NO_EVENT'. That way the sequencer won't play even if the clock is active
-    //  - Disable the sequencer time interrupts. Guess we save some energy on that?
     next_event = NO_EVENT;
 }
 
+
 /** 
- * Call this function from the sequence timer interrupt handler
+ * Main sequencer function
+ *  - Updates the sequencer timer. 
+ *    If next_event != NO_EVENT (0), _and_ we've reached next_event_time:
+ *      + Read the event that next_event points to
+ *      + Start / stop generator based on the event
+ *      + Increment next_event pointer. If next event is _not_ a SEQ_TERMINATOR (0), 
+ *        update next_event_time by reading the time bits of the next event. 
+ *        If it _is_ a SEQ_TERMINATOR, stop the sequence immediately.
  */
 void sequencer_update(){
     TIMER_SEQ_CNT = (TIMER_SEQ_CNT + 1) % UINT16_MAX;
-    /* If it is time for the next event, trigger (on / off) a generator. 
-     * NO_EVENT is defined as 0, so we don't have to write 
-     * `next_event != NO_EVENT && ...`, but you can think about it that way */
     if (next_event && TIMER_SEQ_CNT >= next_event_time) {
         uint32_t inst = (*next_event >> INST_POS) & INST_MASK;
         uint32_t freq = (*next_event >> FREQ_POS) & FREQ_MASK;
@@ -166,8 +183,6 @@ void sequencer_update(){
         else {
             generator_stop(inst);
         }
-        /* SEQ_TERMINATOR is also defined as 0, so the following means 
-         * "If *next_event (after ptr incrementation) is not a SEQ_TERMINATOR..." */
         if (*(++next_event)) {
             uint32_t time = (*next_event) >> TIME_POS & TIME_MASK;
             next_event_time = (TIMER_SEQ_CNT + time) % MAXVAL16;
@@ -176,16 +191,13 @@ void sequencer_update(){
             print_event(sim_counter, TIMER_SEQ_CNT, inst, type, time, freq);
             #endif
         } else {
-            /* If next event is a SEQ_TERMINATOR, we've reached the end of the sequence */
             sequencer_stop();
         }
     } 
 }
 
-// General TODO : Add the following for easily setting and clearing single bits:
-//      #define SET(x,y) (x|=(1<<y))
-//      #define CLR(x,y) (x&=(~(1<<y)))
-
+// /Sequencer
+///////////////////////////////////////////////////////////////////////////////
 
 void DisableSound() {
     // Disable timer interrupt generation
