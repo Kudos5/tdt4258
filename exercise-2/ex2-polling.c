@@ -63,7 +63,6 @@ void PollButtons() {
     static uint16_t previous_button_state;
     // If there is no change in the button state, do nothing
     if ( (button_state & 0xFF) == (previous_button_state & 0xFF) ) {
-        previous_button_state = button_state;
         return;
     }
     // Store the previous state

@@ -55,8 +55,7 @@ void __attribute__ ((interrupt)) TIMER1_IRQHandler() {
 void GPIO_HANDLER() {
     // Read button state
     uint16_t button_state = *GPIO_PC_DIN;
-    // Activate LEDs corresponding to the buttons pressed
-    // *GPIO_PA_DOUT = button_state << 8;
+
     // If the first left button is pressed play a sound
     if ( button_state == ((~(1 << 0)) & 0xFF) ) {
         DisableSound();
