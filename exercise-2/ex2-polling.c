@@ -12,13 +12,9 @@
 void setupGPIO();
 void setupTimer(uint32_t period);
 void setupDAC();
-void enableDACSineGenerationMode();
-void setupNVIC();
 void PollTimer();
 void PollButtons();
 void DisableSound();
-void SetupGenerators();
-void SetupSequencer();
 
 int main(void)
 {
