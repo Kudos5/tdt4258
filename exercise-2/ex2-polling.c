@@ -42,6 +42,7 @@ void PollTimer() {
     }
 
     // Read data from the audio module and give it to the DAC
+    // We must shift and scale the data to be within DACs accepted range of values
     uint16_t data = (audio_update() + 0xFFF) >> 4; 
     *DAC0_CH1DATA = data & 0xFFF;
     *DAC0_CH0DATA = data & 0xFFF;
@@ -58,13 +59,14 @@ void PollTimer() {
 
 void PollButtons() {
     // Read button state
-    uint16_t button_state = *GPIO_PC_DIN;
+    uint16_t button_state = (*GPIO_PC_DIN) & 0xFF;
     static uint16_t previous_button_state;
     // If there is no change in the button state, do nothing
-    if ( button_state == previous_button_state ) {
+    if ( (button_state & 0xFF) == (previous_button_state & 0xFF) ) {
+        previous_button_state = button_state;
         return;
     }
-    // Store the privous state
+    // Store the previous state
     previous_button_state = button_state;
 
     // If the first left button is pressed play a sound
