@@ -4,10 +4,10 @@
 #include "efm32gg.h"
 #include "sound.h"
 
-// The sampling frequency in Hz
-#define     SAMPLING_FREQUENCY AUDIO_HZ
+// The sampling frequency
+#define SAMPLING_FREQUENCY AUDIO_HZ
 // The period between sound samples, in clock cycles 
-#define   SAMPLE_PERIOD_CYCLES (F_HFRCO/SAMPLING_FREQUENCY)
+#define SAMPLE_PERIOD_CYCLES (F_HFRCO/SAMPLING_FREQUENCY)
 
 void setupGPIO();
 void setupTimer(uint32_t period);
