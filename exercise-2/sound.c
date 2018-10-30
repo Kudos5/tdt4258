@@ -200,8 +200,6 @@ void sequencer_update(){
 ///////////////////////////////////////////////////////////////////////////////
 
 void DisableSound() {
-    // Disable timer interrupt generation
-    // *TIMER1_IEN &= ~(1 << 0);
     generator_stop(SQUARE);
     generator_stop(SAW);
     generator_stop(WT);
