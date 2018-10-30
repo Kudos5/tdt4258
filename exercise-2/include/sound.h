@@ -16,13 +16,14 @@ extern const int16_t WAVETABLE[];
 extern const int16_t WAVETABLE_NOISE[];
 void generator_setup();
 
-enum {SAW, SQUARE, NOISE, WT};
+enum { SAW, SQUARE, NOISE, WT };
 void generator_start(uint32_t generator, uint32_t freq);
 void generator_stop(uint32_t generator);
-void generate_sweep(uint32_t gen, uint32_t num_samples_in_sweep, uint32_t fstart, uint32_t fend);
+void generate_sweep(uint32_t gen, uint32_t num_samples_in_sweep,
+		    uint32_t fstart, uint32_t fend);
 int16_t audio_update();
 
-void sequencer_start(const uint32_t* seq_to_play);
+void sequencer_start(const uint32_t * seq_to_play);
 void sequencer_stop();
 void sequencer_update();
 

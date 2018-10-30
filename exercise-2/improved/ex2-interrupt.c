@@ -23,24 +23,23 @@ int main(void)
 	setupDAC();
 	setupTimer(SAMPLE_PERIOD_CYCLES);
 	setupNVIC();
-    generator_setup();
+	generator_setup();
 
 	while (1) {
-        // Sleep until next interrupt
-        __asm__ ("wfi;");
-    }
+		// Sleep until next interrupt
+		__asm__("wfi;");
+	}
 
 	return 0;
 }
 
 void setupNVIC()
 {
-    // Enable Timer1 IRQ Handler
-    *ISER0 |= (1 << 12);
-    // Enable GPIO even handler
-    *ISER0 |= (1 << 1);
-    // Enable GPIO odd handler
-    *ISER0 |= (1 << 11);
+	// Enable Timer1 IRQ Handler
+	*ISER0 |= (1 << 12);
+	// Enable GPIO even handler
+	*ISER0 |= (1 << 1);
+	// Enable GPIO odd handler
+	*ISER0 |= (1 << 11);
 
 }
-
