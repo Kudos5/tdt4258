@@ -1,0 +1,63 @@
+
+PROGRAMS = ex2-polling.bin ex2-interrupt.bin
+
+CC=arm-none-eabi-gcc
+LD=arm-none-eabi-gcc
+OBJCOPY=arm-none-eabi-objcopy
+
+IDIR=../include
+BUILDDIR=../obj
+LDIR=../lib
+SRCDIR=../src
+
+CFLAGS=-mcpu=cortex-m3 -mthumb -g -std=c99 -Wall -Wextra -Wpedantic -I${IDIR}
+LDFLAGS=-mcpu=cortex-m3 -mthumb -g -lgcc -lc -lcs3 -lcs3unhosted -lefm32gg -L${LDIR}
+LINKERSCRIPT=${IDIR}/efm32gg.ld
+PROGRAM=ex2-polling.bin
+# OBJ=dac.o gpio.o timer.o interrupt_handlers.o sound.o seqs.o sweep.o
+# OBJS=dac.o gpio.o timer.o interrupt_handlers.o sound.o seqs.o sweep.o
+SRCS=dac.c gpio.c timer.c interrupt_handlers.c sound.c seqs.c sweep.c
+
+
+OBJS=$(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SRCS:.c=.o))
+
+all: ex2-polling.bin
+	eACommander.sh -r --address 0x00000000 -f $(PROGRAM) -r
+
+ex2-polling.bin: ex2-polling.elf
+	${OBJCOPY} -O binary $< $@
+
+ex2-polling.elf: ${OBJS}
+	${LD} -T ${LINKERSCRIPT} $^ -o $@ ${LDFLAGS}
+
+$(BUILDDIR)/dac.o: $(SRCDIR)/dac.c
+	${CC} ${CFLAGS} -c $< -o $@
+
+# sweep.o: ${SRCDIR}/sweep.c
+#	${CC} ${CFLAGS} -c $< -o $@
+
+# ${BUILDDIR}/%.o: ${SRCDIR}/%.c:
+#	${CC} ${CFLAGS} -c $< -o $@
+
+# ${BUILDDIR}/${OBJS}: ${SRCDIR}/%.c
+#	${CC} ${CFLAGS} -c $< -o ${BUILDDIR}/$@
+
+# Extract binary
+# #%.bin : %.elf
+#	${OBJCOPY} -O binary $< $@
+
+# Link
+# %.elf : ${ODIR}/%.o
+# 	${LD} -T ${LINKERSCRIPT} $^ ${OBJS} -o $@ ${LDFLAGS}
+
+# ${BUILDDIR}/%.o : %.c
+# 	${CC} ${CFLAGS} -c $< -o ${ODIR}/$@
+
+clean :
+	-rm -rf ${BUILDDIR}/*.o *.elf *.bin *.hex
+
+# None file targets
+.PHONY : clean all
+
+# Prevent removing intermediate elf and object files
+.PRECIOUS : %.elf %.o
