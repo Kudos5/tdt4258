@@ -8,6 +8,10 @@
 #include "sound.h"
 #include "showcase.h"
 
+#define CPU_CLOCK_HZ 14000000
+#define TIMER_AUDIO_TOP (CPU_CLOCK_HZ / AUDIO_HZ)
+#define TIMER_SEQ_TOP   (CPU_CLOCK_HZ / SEQ_HZ)
+
 /* Global variables must be declared here, not in the header */
 uint32_t seq_counter = 0;          // Simulates sequencer timer clock
 uint32_t aud_counter = 0;          // Simulates audio timer clock

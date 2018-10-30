@@ -4,6 +4,35 @@
 #include "showcase.h"
 #endif
 
+#define NO_EVENT 0x00000000
+/* Bit masks used by the sequencer*/
+#define TYPE_MASK 0x00000001
+#define TIME_MASK 0x000007FF
+#define INST_MASK 0x00000003
+#define FREQ_MASK 0x000003FF
+/* Position of first bit for each info field in sequencer events */
+#define TIME_POS 1
+#define INST_POS 12
+#define FREQ_POS 14
+
+/* Sequencer and generator information */
+#define SEQ_CLOCK_HZ 1000
+#define NUM_GENERATORS 4
+#define GEN_HIGH 2047
+#define GEN_LOW -2048
+#define WT_SIZE 32
+#define WT_NOISE_SIZE 128
+
+/* Panic function */
+void DisableSound() {
+    generator_stop(SQUARE);
+    generator_stop(SAW);
+    generator_stop(WT);
+    generator_stop(NOISE);
+    // generator_stop_all();
+    sequencer_stop();
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // 
@@ -11,14 +40,16 @@
 // 
 ///////////////////////////////////////////////////////////////////////////////
 
+
 static uint32_t GENERATORS_ON = 0;  /* Flags for setting which generators are active */
 
+void sweep();                       /* Sweep functionality is implemented below */
 void modsquare();
 void sawtooth();
 void wavetable();
 void noise();
 typedef struct gen_struct {
-    uint32_t position_in_cycles;    // Inspired by Audacity source code
+    uint32_t position_in_cycles;    /* Temporal position of the generator */
     uint32_t frequency;             /* Current frequency of the generator */
     int16_t  current_value;         /* This is where the output sample of each generator is set and read from */
     void (*GENERATOR)();            /* Pointer to the generator update function */
@@ -75,10 +106,6 @@ void noise() {
 }
 //////////////////////////////////////////////////
 
-void generator_set_frequency(uint32_t gen, uint32_t current_freq_scaled, uint32_t scaling){
-    generators[gen].frequency = current_freq_scaled / scaling; 
-}
-
 /** 
  * Function to activate a generator.
  * To be run on "note on" type events or to trigger one-shot sounds.
@@ -87,7 +114,7 @@ void generator_set_frequency(uint32_t gen, uint32_t current_freq_scaled, uint32_
  * */
 void generator_start(uint32_t gen, uint32_t freq) {
     GENERATORS_ON |= (1 << gen);        /* Set the 'on' flag for the given generator */
-    generators[gen].current_value = 0;  /* *(Re)set the value of of the generator */
+    generators[gen].current_value = 0;  /* (Re)set the value of of the generator */
     generators[gen].frequency = freq;   /* Set current frequency of the generator */
     orgfreq = freq;                     /* Only used by the modulated square generator */
     generators[gen].GENERATOR();        /* Run the updater function immediately */
@@ -206,18 +233,52 @@ void sequencer_update(){
             sequencer_stop();
         }
     } 
-    // TIMER_SEQ_CNT = (TIMER_SEQ_CNT + 1) % UINT16_MAX;
 }
 
 // /Sequencer
 ///////////////////////////////////////////////////////////////////////////////
 
-void DisableSound() {
-    generator_stop(SQUARE);
-    generator_stop(SAW);
-    generator_stop(WT);
-    generator_stop(NOISE);
-    // generator_stop_all();
-    sequencer_stop();
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Sweep
+//
+///////////////////////////////////////////////////////////////////////////////
+#define SCALING 100
+
+static uint32_t current_freq_scaled;
+static uint32_t freq_start_scaled;
+static uint32_t freq_end_scaled;
+static uint32_t freq_delta_scaled;
+static int32_t sweeped_gen = -1;
+
+/**
+ * Update the frequency of sweeping generators
+ */
+void sweep() {
+    if (sweeped_gen < 0)
+        return;
+    if (current_freq_scaled >= freq_end_scaled){
+        current_freq_scaled = SCALING*freq_start_scaled;
+        generator_stop(sweeped_gen);
+        sweeped_gen = -1;
+    } else {
+        current_freq_scaled += freq_delta_scaled;
+    }
+    generators[sweeped_gen].frequency = current_freq_scaled / SCALING;
 }
 
+void generate_sweep(uint32_t gen, uint32_t num_samples_in_sweep, uint32_t fstart, uint32_t fend) {
+    sequencer_stop();
+    sweeped_gen = gen;
+    freq_start_scaled = SCALING*fstart;
+    freq_end_scaled = SCALING*fend;
+    current_freq_scaled = freq_start_scaled;
+    /* \/ Floating point exception here \/ */
+    freq_delta_scaled = (uint32_t) (freq_end_scaled - freq_start_scaled) / num_samples_in_sweep;
+    generator_start(gen, fstart);
+}
+
+// /Sweep
+///////////////////////////////////////////////////////////////////////////////
