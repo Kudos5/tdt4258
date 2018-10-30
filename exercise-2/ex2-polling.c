@@ -59,25 +59,35 @@ void PollTimer() {
 void PollButtons() {
     // Read button state
     uint16_t button_state = *GPIO_PC_DIN;
+    static uint16_t previous_button_state;
+    // If there is no change in the button state, do nothing
+    if ( button_state == previous_button_state ) {
+        return;
+    }
+    // Store the privous state
+    previous_button_state = button_state;
+
     // If the first left button is pressed play a sound
     if ( button_state == ((~(1 << 0)) & 0xFF) ) {
         DisableSound();
         sequencer_start(seq);
     }
-    // If the right button is pressed, stop the sound
+    // Up button
     else if ( button_state == ((~(1 << 1)) & 0xFF) ) {
         DisableSound();
         sequencer_start(seq2);
     }
+    // Right button
     else if ( button_state == ((~(1 << 2)) & 0xFF) ) {
         DisableSound();
         generate_sweep(WT, 4000, 0, 4000);
     }
+    // Down button
     else if ( button_state == ((~(1 << 3)) & 0xFF) ) {
-        // sequencer_start(seq4);
         DisableSound();
         generate_sweep(NOISE, 4000, 0, 4000);
     }
+    // If the second left button is pressed, stop the sound
     else if ( button_state == ((~(1 << 4)) & 0xFF) ) {
         DisableSound();
     }
