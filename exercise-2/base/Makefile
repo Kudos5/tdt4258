@@ -26,7 +26,12 @@ INCDEP      := -I$(INCDIR)
 SOURCES     := $(shell find $(SRCDIR) -type f -name '*.$(SRCEXT)')
 OBJECTS     := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
 
-all: $(TARGET).bin upload
+all: directories $(TARGET).bin upload
+
+directories: $(BUILDDIR)
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
 
 upload:
 	-eACommander.sh -r --address 0x00000000 -f "${TARGET}.bin" -r
@@ -51,4 +56,4 @@ $(BUILDDIR)/$(TARGET).o: $(TARGET).$(SRCEXT)
 	${CC} ${CFLAGS} -c $< -o $@
 
 #Non file targets
-.PHONY: all remake clean upload
+.PHONY: all remake clean upload directories
