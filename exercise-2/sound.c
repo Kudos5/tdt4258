@@ -91,6 +91,7 @@ void generator_start(uint32_t gen, uint32_t freq) {
     generators[gen].frequency = freq;   /* Set current frequency of the generator */
     orgfreq = freq;                     /* Only used by the modulated square generator */
     generators[gen].GENERATOR();        /* Run the updater function immediately */
+    generators[gen].position_in_cycles = 0;
 }
 
 
@@ -101,6 +102,16 @@ void generator_start(uint32_t gen, uint32_t freq) {
 void generator_stop(uint32_t gen) {
     GENERATORS_ON &= ~(1 << gen);
     generators[gen].current_value = 0;
+    generators[gen].position_in_cycles = 0;
+}
+
+void generator_stop_all() {
+    for ( int i = 0; i < NUM_GENERATORS; ++i ) {
+        GENERATORS_ON = 0;
+        generators[i].position_in_cycles = 0;
+        generators[i].frequency = 0;
+        generators[i].current_value = 0;
+    }
 }
 
 
@@ -149,6 +160,7 @@ void sequencer_start(const uint32_t* seq_to_play) {
     if (next_event)
         return;
     next_event = (uint32_t*) seq_to_play;
+    next_event_time = TIMER_SEQ_CNT + 1;
 }
 
 
@@ -172,8 +184,8 @@ void sequencer_stop(){
  *        If it _is_ a SEQ_TERMINATOR, stop the sequence immediately.
  */
 void sequencer_update(){
-    TIMER_SEQ_CNT = (TIMER_SEQ_CNT + 1) % UINT16_MAX;
-    if (next_event && TIMER_SEQ_CNT >= next_event_time) {
+    ++TIMER_SEQ_CNT;
+    if (next_event && (TIMER_SEQ_CNT >= next_event_time)) {
         uint32_t inst = (*next_event >> INST_POS) & INST_MASK;
         uint32_t freq = (*next_event >> FREQ_POS) & FREQ_MASK;
         /* If the event is 'note on' type */
@@ -185,7 +197,7 @@ void sequencer_update(){
         }
         if (*(++next_event)) {
             uint32_t time = (*next_event) >> TIME_POS & TIME_MASK;
-            next_event_time = (TIMER_SEQ_CNT + time) % MAXVAL16;
+            next_event_time = TIMER_SEQ_CNT + time;
             #ifdef SHOWCASE
             char* type    = (*next_event & TYPE_MASK) ? "On\0" : "Off\0";
             print_event(sim_counter, TIMER_SEQ_CNT, inst, type, time, freq);
@@ -194,6 +206,7 @@ void sequencer_update(){
             sequencer_stop();
         }
     } 
+    // TIMER_SEQ_CNT = (TIMER_SEQ_CNT + 1) % UINT16_MAX;
 }
 
 // /Sequencer
@@ -204,6 +217,7 @@ void DisableSound() {
     generator_stop(SAW);
     generator_stop(WT);
     generator_stop(NOISE);
+    // generator_stop_all();
     sequencer_stop();
 }
 
