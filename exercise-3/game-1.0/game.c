@@ -26,8 +26,9 @@ int main(int argc, char *argv[])
     }
 
     // Let's map the file descriptor to a memory location
-    uint16_t buffer[SCREEN_WIDTH*SCREEN_HEIGHT];
-    uint16_t * screen = mmap(buffer, sizeof(buffer), PROT_WRITE, MAP_SHARED, fb_file, 0);
+    // uint16_t buffer[SCREEN_WIDTH*SCREEN_HEIGHT];
+    // uint16_t * screen = mmap(buffer, sizeof(buffer), PROT_WRITE, MAP_SHARED, fb_file, 0);
+    uint16_t * screen = mmap(NULL, SCREEN_WIDTH*SCREEN_HEIGHT*2, PROT_WRITE, MAP_SHARED, fb_file, 0);
     if ( screen == MAP_FAILED ) {
         printf("Failed to map memory: %d\n", errno);
         exit(EXIT_FAILURE);
