@@ -19,21 +19,10 @@ int main(int argc, char *argv[])
     int ret;
 	printf("Hello World, I'm game!\n");
 
-    // FILE * fb_file = fopen("/dev/fb0", "wb");
     int fb_file = open("/dev/fb0", O_RDWR);
     if ( fb_file == -1 ) {
         printf("Failed to open file\n");
         exit(EXIT_FAILURE);
-    }
-
-    // Get file stat
-    struct stat fb_stat;
-    ret = fstat(fb_file, &fb_stat);
-    if ( ret == -1 ) {
-        printf("Failed to state file\n");
-        exit(EXIT_FAILURE);
-    } else {
-        printf("Total size in bytes: %lu\n", fb_stat.st_size);
     }
 
     // Let's map the file descriptor to a memory location
@@ -43,10 +32,10 @@ int main(int argc, char *argv[])
         printf("Failed to map memory: %d\n", errno);
         exit(EXIT_FAILURE);
     }
+
     printf("I will now clear the screen\n");
     for ( int i = 0; i < SCREEN_WIDTH*SCREEN_HEIGHT; ++i ) {
         screen[i] = 0;
-        // buffer[i] = 0;
     }
     struct fb_copyarea rect;
     rect.dx = 0;
