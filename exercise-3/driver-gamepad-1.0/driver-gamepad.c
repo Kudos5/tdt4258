@@ -24,14 +24,15 @@
 #define GPIO_EXTIFALL  ((volatile uint32_t*)(GPIO_PA_BASE + 0x10c))
 #define GPIO_IEN       ((volatile uint32_t*)(GPIO_PA_BASE + 0x110))
 void setupGPIO(void) {
-    // enable GPIO clock
-	// *CMU_HFPERCLKEN0 |= CMU2_HFPERCLKEN0_GPIO;	
+    // TODO: Implement without hardcoding adresses.
+    // Is it possible to get all adresses, or do we have to hardcode offsets?
     int long unsigned current_value;
     int long unsigned new_value;
-
-    current_value = ioread32(CMU_HFPERCLKEN0);
-    new_value = current_value | CMU2_HFPERCLKEN0_GPIO;
-    iowrite32(new_value, CMU_HFPERCLKEN0);
+    // enable GPIO clock
+	// *CMU_HFPERCLKEN0 |= CMU2_HFPERCLKEN0_GPIO;	
+    // current_value = ioread32(CMU_HFPERCLKEN0);
+    // new_value = current_value | CMU2_HFPERCLKEN0_GPIO;
+    // iowrite32(new_value, CMU_HFPERCLKEN0);
 
 	// Enable buttons
 	// Set GPIO PC to input
