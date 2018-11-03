@@ -8,22 +8,28 @@
 #include <linux/platform_device.h>
 // #include <linux/types.h>
 #include <linux/io.h>
+#include <linux/interrupt.h>
 
 #define CMU_BASE2 0x400c8000
 #define CMU_HFPERCLKEN0  ((volatile __u32*)(CMU_BASE2 + 0x044))
 #define CMU2_HFPERCLKEN0_GPIO   (1 << 13)
 
+#define GPIO_BASE    0x40006000
+#define GPIO_PA_BASE 0x40006000
 #define GPIO_PC_BASE 0x40006048
+
 #define GPIO_PC_MODEL    ((volatile uint32_t*)(GPIO_PC_BASE + 0x04))
 #define GPIO_PC_DOUT     ((volatile uint32_t*)(GPIO_PC_BASE + 0x0c))
 
-#define GPIO_PA_BASE 0x40006000
 #define GPIO_PA_DOUT     ((volatile uint32_t*)(GPIO_PA_BASE + 0x0c))
 #define GPIO_PA_MODEH    ((volatile uint32_t*)(GPIO_PA_BASE + 0x08))
-#define GPIO_EXTIPSELL ((volatile uint32_t*)(GPIO_PA_BASE + 0x100))
-#define GPIO_EXTIFALL  ((volatile uint32_t*)(GPIO_PA_BASE + 0x10c))
-#define GPIO_IEN       ((volatile uint32_t*)(GPIO_PA_BASE + 0x110))
-void setupGPIO(void) {
+
+#define GPIO_EXTIPSELL ((volatile uint32_t*)(GPIO_BASE + 0x100))
+#define GPIO_EXTIFALL  ((volatile uint32_t*)(GPIO_BASE + 0x10c))
+#define GPIO_IEN       ((volatile uint32_t*)(GPIO_BASE + 0x110))
+#define GPIO_IF        ((volatile uint32_t*)(GPIO_BASE + 0x114))
+#define GPIO_IFC       ((volatile uint32_t*)(GPIO_BASE + 0x11c))
+static void setupGPIO(void) {
     // TODO: Implement without hardcoding adresses.
     // Is it possible to get all adresses, or do we have to hardcode offsets?
     int long unsigned current_value;
@@ -76,6 +82,24 @@ void setupGPIO(void) {
 
 }
 
+static irqreturn_t ToggleLeds(int irq, void * dev) {
+    int long unsigned current_value;
+    int long unsigned new_value;
+    current_value = ioread32(GPIO_PA_DOUT);
+    new_value = current_value ^ (1 << 12);
+    new_value = new_value ^ (1 << 13);
+    new_value = new_value ^ (1 << 14);
+    iowrite32(new_value, GPIO_PA_DOUT);
+
+	// Clear the interrupt to avoid repeating interrupts
+	// *GPIO_IFC |= *GPIO_IF;
+    current_value = ioread32(GPIO_IFC);
+    new_value = current_value | ioread32(GPIO_IF);
+    iowrite32(new_value, GPIO_IFC);
+
+    return IRQ_HANDLED;
+}
+
 static int gp_probe(struct platform_device * dev) {
     int gpio_even_irq;
     int gpio_odd_irq;
@@ -104,11 +128,26 @@ static int gp_probe(struct platform_device * dev) {
     printk("GPIO even IRQ: %d\n", gpio_even_irq);
     printk("GPIO odd IRQ: %d\n", gpio_odd_irq);
     setupGPIO();
+    // Register an interrupt
+    if (request_irq(gpio_even_irq, ToggleLeds, IRQF_SHARED, "gpio_even", dev)) {
+        printk(KERN_ERR "rtc: cannot register IRQ %d\n", gpio_even_irq);
+        return -EIO;
+    }
+    if (request_irq(gpio_odd_irq, ToggleLeds, IRQF_SHARED, "gpio_even", dev)) {
+        printk(KERN_ERR "rtc: cannot register IRQ %d\n", gpio_odd_irq);
+        return -EIO;
+    }
     return 0;
 }
 
 static int gp_remove(struct platform_device * dev) {
+    int gpio_even_irq;
+    int gpio_odd_irq;
     printk("gp_remove called\n");
+    gpio_even_irq = platform_get_irq(dev, 0);
+    gpio_odd_irq = platform_get_irq(dev, 1);
+    free_irq(gpio_even_irq, dev);
+    free_irq(gpio_odd_irq, dev);
     return 0;
 }
 
