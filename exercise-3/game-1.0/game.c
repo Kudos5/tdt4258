@@ -4,48 +4,134 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <linux/fcntl.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <errno.h>
+#include <signal.h>
 #include <sys/mman.h>
+#include <linux/fs.h>
+
+#include "driver-gamepad-1.0/driver-gamepad.h"
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 
+static int gp_fd;
+static int fb_fd;
 
-int main(int argc, char *argv[])
-{
-    int ret;
-	printf("Hello World, I'm game!\n");
+static uint16_t * game_screen;
 
-    int fb_file = open("/dev/fb0", O_RDWR);
-    if ( fb_file == -1 ) {
+static int flag_button_pressed;
+static int game_button_state;
+
+static uint16_t game_background_colour = 0x0000;
+static uint16_t game_cursor_colour = 0xFFFF;
+
+static struct fb_copyarea game_cursor;
+
+void input_handler(int signum) {
+    game_button_state = ioctl(gp_fd, GP_IOCTL_GET_BUTTON_STATE);
+    flag_button_pressed = 1;
+    printf("Signal handled: %d\n", signum);
+    printf("button state: %#8X\n", game_button_state);
+}
+
+void SetupGamepad(void) {
+    int oflags;
+    gp_fd = open("/dev/gamepad", O_RDWR);
+    if ( gp_fd < 0 ) {
         printf("Failed to open file\n");
         exit(EXIT_FAILURE);
     }
 
-    // Let's map the file descriptor to a memory location
-    // uint16_t buffer[SCREEN_WIDTH*SCREEN_HEIGHT];
-    // uint16_t * screen = mmap(buffer, sizeof(buffer), PROT_WRITE, MAP_SHARED, fb_file, 0);
-    uint16_t * screen = mmap(NULL, SCREEN_WIDTH*SCREEN_HEIGHT*2, PROT_WRITE, MAP_SHARED, fb_file, 0);
-    if ( screen == MAP_FAILED ) {
-        printf("Failed to map memory: %d\n", errno);
-        exit(EXIT_FAILURE);
-    }
+    // Subscribe to signals from gamepad
+    signal(SIGIO, &input_handler);
+    fcntl(gp_fd, F_SETOWN, getpid( ));
+    oflags = fcntl(gp_fd, F_GETFL);
+    fcntl(gp_fd, F_SETFL, oflags | FASYNC);
+}
 
-    printf("I will now clear the screen\n");
-    for ( int i = 0; i < SCREEN_WIDTH*SCREEN_HEIGHT; ++i ) {
-        screen[i] = 0;
+void SetArea(struct fb_copyarea * area, uint16_t colour) {
+    int x_max = area->dx + area->width;
+    int y_max = area->dy + area->height;
+    for ( int y = area->dy; y < y_max; ++y ) {
+        for ( int x = area->dx; x < x_max; ++x ) {
+            size_t index = (y*SCREEN_WIDTH + x);
+            game_screen[index] = colour;
+        }
     }
+    ioctl(fb_fd, 0x4680, area);
+}
+
+void ClearArea(struct fb_copyarea * area) {
+    SetArea(area, game_background_colour);
+}
+
+void ClearScreen() {
     struct fb_copyarea rect;
     rect.dx = 0;
     rect.dy = 0;
     rect.width = SCREEN_WIDTH;
     rect.height = SCREEN_HEIGHT;
-    ioctl(fb_file, 0x4680, &rect);
+    ClearArea(&rect);
+}
 
-    ret = close(fb_file);
+void DrawBackground() {
+    // TODO: Make this nice, instead of just setting everything to black
+    ClearScreen();
+}
+
+void SetupCursor() {
+    game_cursor.width = 10;
+    game_cursor.height = 10;
+    game_cursor.dx = 0;
+    game_cursor.dy = 0;
+}
+
+void DrawCursor() {
+    SetArea(&game_cursor, game_cursor_colour);
+}
+
+int main(int argc, char *argv[])
+{
+	printf("Hello World, I'm game!\n");
+    int ret;
+
+    fb_fd = open("/dev/fb0", O_RDWR);
+    if ( fb_fd == -1 ) {
+        printf("Failed to open file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Let's map the file descriptor to a memory location
+    game_screen = mmap(NULL, SCREEN_WIDTH*SCREEN_HEIGHT*2, PROT_WRITE, MAP_SHARED, fb_fd, 0);
+    if ( game_screen == MAP_FAILED ) {
+        printf("Failed to map memory: %d\n", errno);
+        exit(EXIT_FAILURE);
+    }
+    SetupGamepad();
+    DrawBackground();
+    SetupCursor();
+    DrawCursor();
+    while (1) {
+        pause();
+        if ( flag_button_pressed ) {
+            // DrawBackground();
+            // int cursor_direction = decode_button_state(button_state);
+            // MoveCursor(cursor_direction);
+            flag_button_pressed = 0;
+        }
+    }
+
+    // Clean up
+    ret = close(fb_fd);
+    if ( ret == -1 ) {
+        printf("Failed to close file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    ret = close(gp_fd);
     if ( ret == -1 ) {
         printf("Failed to close file\n");
         exit(EXIT_FAILURE);

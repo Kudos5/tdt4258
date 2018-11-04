@@ -6,9 +6,9 @@
 # add more flags here,
 # but don't remove the "+="
 #
-CFLAGS += -O2 -g -Wall -Wsign-compare -Wfloat-equal -Wformat-security -Wall -Wextra -pedantic -std=c99 #-Werror
+CFLAGS += -O2 -g -Wall -Wsign-compare -Wfloat-equal -Wformat-security -Wall -Wextra -pedantic -std=c99 -I.. #-Werror
 CPPFLAGS +=
-LDFLAGS +=
+LDFLAGS += 
 
 
 all: game
