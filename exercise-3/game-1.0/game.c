@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <sys/mman.h>
 #include <linux/fs.h>
+#include <time.h>
 
 #include "driver-gamepad-1.0/driver-gamepad.h"
 
@@ -23,6 +24,8 @@ static int fb_fd;
 static uint16_t * game_screen;
 
 static int flag_button_pressed;
+static int flag_update_screen_timer;
+
 static int game_button_state;
 
 static uint16_t game_background_colour = 0x0000;
@@ -30,11 +33,21 @@ static uint16_t game_cursor_colour = 0xFFFF;
 
 static struct fb_copyarea game_cursor;
 
+void UpdateScreen() {
+}
+
+void alarm_handler(int signum) {
+    // Just to avoid warnings
+    signum = signum;
+    flag_update_screen_timer = 1;
+    // Trigger a new alarm
+    alarm(1);
+}
+
 void input_handler(int signum) {
+    signum = signum;
     game_button_state = ioctl(gp_fd, GP_IOCTL_GET_BUTTON_STATE);
     flag_button_pressed = 1;
-    printf("Signal handled: %d\n", signum);
-    printf("button state: %#8X\n", game_button_state);
 }
 
 void SetupGamepad(void) {
@@ -93,7 +106,7 @@ void DrawCursor() {
     SetArea(&game_cursor, game_cursor_colour);
 }
 
-int main(int argc, char *argv[])
+int main()
 {
 	printf("Hello World, I'm game!\n");
     int ret;
@@ -111,16 +124,23 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     SetupGamepad();
+    // Setup a signal handler for the alarm signal which is used to periodically update
+    // the screen
+    signal(SIGALRM, &alarm_handler);
     DrawBackground();
     SetupCursor();
     DrawCursor();
+    alarm(1);
     while (1) {
         pause();
         if ( flag_button_pressed ) {
-            // DrawBackground();
-            // int cursor_direction = decode_button_state(button_state);
-            // MoveCursor(cursor_direction);
+            printf("Button pressed\n");
             flag_button_pressed = 0;
+        } 
+        if (flag_update_screen_timer) {
+            printf("Updating screen\n");
+            UpdateScreen();
+            flag_update_screen_timer = 0;
         }
     }
 
