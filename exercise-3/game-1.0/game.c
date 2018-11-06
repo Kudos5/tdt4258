@@ -15,9 +15,12 @@
 
 #include "driver-gamepad-1.0/driver-gamepad.h"
 
+#define NUM_PLAYERS 1	// TODO : Consider making this dynamic, so that # players can be decided in a menu?
+#define SNAKE_LENGTH 5
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
-#define SNAKE_LENGTH 5
+#define DELTA_X 10
+#define DELTA_Y 10
 
 static int gp_fd;
 static int fb_fd;
@@ -45,6 +48,35 @@ void alarm_handler(int signum) {
     flag_update_screen_timer = 1;
     // Trigger a new alarm
     alarm(1);
+}
+
+enum { UP, DOWN, LEFT, RIGHT };
+struct Player {
+    struct fb_copyarea snake_head;		// Position of the snake head
+    struct fb_copyarea snake[SNAKE_LENGTH];	// Array of entire snake (body and head)
+    uint16_t color;
+    int direction;				// Keep track of which way snake is moving
+}
+    
+static struct Player players[NUM_PLAYERS];
+
+void SetupPlayers() {
+    /* This one looks messy when using fb_copyareas for all snake blocks, 
+     * but I think it makes things easier other places in the code  */
+    for (int p = 0; p < NUM_PLAYERS; p++) {
+	    players[p].snake_head.width = DELTA_X;
+	    players[p].snake_head.height = DELTA_Y;
+	    players[p].snake_head.dx = 0;	/* TODO : Make the position random */
+	    players[p].snake_head.dy = 0;	/* OR just make each snake start in its own corner */
+	/* Initialize snake blocks */
+        for (int sb = 0; sb < SNAKE_LENGTH; sb++) {
+            players[p].snake[sb].dx = 0;	// TODO : Do something smart here, to avoid...
+            players[p].snake[sb].dy = 0;	// ...overwriting blocks that we don't want to clear
+            players[p].snake[sb].width = DELTA_X;
+            players[p].snake[sb].height = DELTA_Y;
+        }
+	players[p].direction = DOWN;
+    }
 }
 
 void input_handler(int signum) {
@@ -98,8 +130,6 @@ void DrawBackground() {
     ClearScreen();
 }
 
-#define DELTA_X 10
-#define DELTA_Y 10
 void SetupCursor() {
     game_cursor.width = DELTA_X;
     game_cursor.height = DELTA_Y;
@@ -117,15 +147,22 @@ void DrawCursor() {
     SetArea(&game_cursor, game_cursor_colour);
 }
 
+
+#define BTN_L_LEFT(btn_state) ((~btn_state) & 0x01)
+#define BTN_L_UP(btn_state) ((~btn_state) & 0x02)
+#define BTN_L_RIGHT(btn_state) ((~btn_state) & 0x04)
+#define BTN_L_DOWN(btn_state) ((~btn_state) & 0x08)
 enum { BTN_L_LEFT, BTN_L_RIGHT, BTN_L_UP, BTN_L_DOWN,
        BTN_R_LEFT, BTN_R_RIGHT, BTN_R_UP, BTN_R_DOWN };
 
+/* TODO: Change this function to one that simply sets player directions based on 
+ * which button is pressed. */
 static inline int decode_button_state(int button_state)
 {
     switch(button_state) {
     case 0xFE : return BTN_L_LEFT;
-    case 0xFB : return BTN_L_RIGHT;
     case 0xFD : return BTN_L_UP;
+    case 0xFB : return BTN_L_RIGHT;
     case 0xF7 : return BTN_L_DOWN;
     case 0xEF : return BTN_R_LEFT;
     case 0xBF : return BTN_R_RIGHT;
@@ -134,14 +171,25 @@ static inline int decode_button_state(int button_state)
     }
 }
 
+static inline void button_action(int button_state)
+{
+    if BTN_L_LEFT(button_state):
+    if BTN_L_RIGHT(button_state):
+    if BTN_L_UP(button_state):
+    if BTN_L_DOWN(button_state):
+} 
+
 static inline void MoveCursor(int cursor_direction)
 {
     int new_x = game_cursor.dx;
     int new_y = game_cursor.dy;
+    int new_dir;
     switch(cursor_direction) {
     case BTN_L_LEFT:
     case BTN_R_LEFT:
+        if 
         new_x -= DELTA_X;
+	new_dir = LEFT;
         break;
     case BTN_L_RIGHT:
     case BTN_R_RIGHT:
