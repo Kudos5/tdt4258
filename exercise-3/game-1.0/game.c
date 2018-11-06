@@ -93,6 +93,62 @@ void DrawCursor() {
     SetArea(&game_cursor, game_cursor_colour);
 }
 
+
+enum { BTN_L_LEFT, BTN_L_RIGHT, BTN_L_UP, BTN_L_DOWN,
+       BTN_R_LEFT, BTN_R_RIGHT, BTN_R_UP, BTN_R_DOWN };
+
+static inline int decode_button_state(int button_state)
+{
+    switch(button_state) {
+    case 0xFE : return BTN_L_LEFT;
+    case 0xFB : return BTN_L_RIGHT;
+    case 0xFD : return BTN_L_UP;
+    case 0xF7 : return BTN_L_DOWN;
+    case 0xEF : return BTN_R_LEFT;
+    case 0xBF : return BTN_R_RIGHT;
+    case 0xDF : return BTN_R_UP;
+    case 0x7F : return BTN_R_DOWN;
+    }
+}
+
+#define DELTA_X 10
+#define DELTA_Y 10
+static inline void MoveCursor(int cursor_direction)
+{
+    int new_x = game_cursor.dx;
+    int new_y = game_cursor.dy;
+    switch(cursor_direction) {
+    case BTN_L_LEFT:
+    case BTN_R_LEFT:
+        new_x -= DELTA_X;
+        break;
+    case BTN_L_RIGHT:
+    case BTN_R_RIGHT:
+        new_x += DELTA_X;
+        break;
+    case BTN_L_UP:
+    case BTN_R_UP:
+        new_y -= DELTA_Y;
+        break;
+    case BTN_L_DOWN:
+    case BTN_R_DOWN:
+        new_y += DELTA_Y;
+        break;
+    }
+    /* Don't move if we'll cross the boundaries */
+    if (new_x < 0 || (new_x + game_cursor.width) > SCREEN_WIDTH)
+        return;
+    if (new_y < 0 || (new_y + game_cursor.height) > SCREEN_HEIGHT)
+        return;
+    // TODO : Right now ClearArea will update the screen, which is unnecessary
+    //ClearArea(&game_cursor);	
+    /* Move the cursor if */
+    game_cursor.dx = new_x;
+    game_cursor.dy = new_y;
+    DrawCursor();
+
+}
+
 int main(int argc, char *argv[])
 {
 	printf("Hello World, I'm game!\n");
@@ -118,8 +174,8 @@ int main(int argc, char *argv[])
         pause();
         if ( flag_button_pressed ) {
             // DrawBackground();
-            // int cursor_direction = decode_button_state(button_state);
-            // MoveCursor(cursor_direction);
+            int cursor_direction = decode_button_state(game_button_state);
+            MoveCursor(cursor_direction);
             flag_button_pressed = 0;
         }
     }
