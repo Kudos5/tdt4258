@@ -33,10 +33,7 @@ static int flag_update_screen_timer;
 static int game_button_state;
 
 static uint16_t game_background_colour = 0x0000;
-static uint16_t game_cursor_colour = 0xFFFF;
 
-static struct fb_copyarea game_cursor;
-static struct fb_copyarea snake[SNAKE_LENGTH];
 static unsigned int snake_array_index;
 
 void UpdateScreen() {
@@ -56,7 +53,7 @@ struct Player {
     struct fb_copyarea snake[SNAKE_LENGTH];	// Array of entire snake (body and head)
     uint16_t color;
     int direction;				// Keep track of which way snake is moving
-}
+};
     
 static struct Player players[NUM_PLAYERS];
 
@@ -76,6 +73,7 @@ void SetupPlayers() {
             players[p].snake[sb].height = DELTA_Y;
         }
 	players[p].direction = DOWN;
+	players[p].color = 0xFFFF;
     }
 }
 
@@ -130,99 +128,140 @@ void DrawBackground() {
     ClearScreen();
 }
 
-void SetupCursor() {
-    game_cursor.width = DELTA_X;
-    game_cursor.height = DELTA_Y;
-    game_cursor.dx = 0;
-    game_cursor.dy = 0;
-    for (int i = 0; i < SNAKE_LENGTH; i++) {
-        snake[i].dx = 0;
-        snake[i].dy = 0;
-        snake[i].width = DELTA_X;
-        snake[i].height = DELTA_Y;
+
+#define BTN_L_LEFT(btn_state) ((btn_state) & 0x01)
+#define BTN_L_UP(btn_state) ((btn_state) & 0x02)
+#define BTN_L_RIGHT(btn_state) ((btn_state) & 0x04)
+#define BTN_L_DOWN(btn_state) ((btn_state) & 0x08)
+
+static inline void change_direction(struct Player* player, int change_dir) {
+    // RIGHT: Change direction clockwise
+    // LEFT / other: CCW
+    printf("Current dir: %d\n", player->direction);
+    switch (player->direction) {
+    case LEFT:
+	player->direction = (change_dir == RIGHT ? UP : DOWN);
+	break;
+    case RIGHT:
+	player->direction = (change_dir == RIGHT ? DOWN : UP);
+	break;
+    case UP:
+	player->direction = (change_dir == RIGHT ? RIGHT : LEFT);
+	break;
+    case DOWN:
+	player->direction = (change_dir == RIGHT ? LEFT : RIGHT);
+	break;
+    default:
+  	player->direction = DOWN;
     }
+    printf("New dir: %d\n", player->direction);
 }
 
-void DrawCursor() {
-    SetArea(&game_cursor, game_cursor_colour);
-}
-
-
-#define BTN_L_LEFT(btn_state) ((~btn_state) & 0x01)
-#define BTN_L_UP(btn_state) ((~btn_state) & 0x02)
-#define BTN_L_RIGHT(btn_state) ((~btn_state) & 0x04)
-#define BTN_L_DOWN(btn_state) ((~btn_state) & 0x08)
-enum { BTN_L_LEFT, BTN_L_RIGHT, BTN_L_UP, BTN_L_DOWN,
-       BTN_R_LEFT, BTN_R_RIGHT, BTN_R_UP, BTN_R_DOWN };
-
-/* TODO: Change this function to one that simply sets player directions based on 
- * which button is pressed. */
-static inline int decode_button_state(int button_state)
-{
-    switch(button_state) {
-    case 0xFE : return BTN_L_LEFT;
-    case 0xFD : return BTN_L_UP;
-    case 0xFB : return BTN_L_RIGHT;
-    case 0xF7 : return BTN_L_DOWN;
-    case 0xEF : return BTN_R_LEFT;
-    case 0xBF : return BTN_R_RIGHT;
-    case 0xDF : return BTN_R_UP;
-    case 0x7F : return BTN_R_DOWN;
-    }
-}
-
+/* TODO? Make button to player mapping dynamic  */
 static inline void button_action(int button_state)
 {
-    if BTN_L_LEFT(button_state):
-    if BTN_L_RIGHT(button_state):
+    static int prev_button_state = 0xFF;
+
+    int newly_pressed = (prev_button_state ^ button_state) & prev_button_state;
+    prev_button_state = button_state;
+
+    if (BTN_L_LEFT(newly_pressed))
+	change_direction(&players[0], LEFT);
+    if (BTN_L_RIGHT(newly_pressed))
+	change_direction(&players[0], RIGHT);
+    /* More buttons eventually 
     if BTN_L_UP(button_state):
     if BTN_L_DOWN(button_state):
+    */
 } 
 
-static inline void MoveCursor(int cursor_direction)
+/* To be called every clock cycle */
+/** pi - player index
+ **/
+/*
+static inline void MoveCursor(int pi)
 {
-    int new_x = game_cursor.dx;
-    int new_y = game_cursor.dy;
-    int new_dir;
-    switch(cursor_direction) {
-    case BTN_L_LEFT:
-    case BTN_R_LEFT:
-        if 
+    int new_x = players[pi].snake_head.dx;
+    int new_y = players[pi].snake_head.dy;
+    switch(players[pi].direction) {
+    case LEFT:
         new_x -= DELTA_X;
-	new_dir = LEFT;
         break;
-    case BTN_L_RIGHT:
-    case BTN_R_RIGHT:
+    case RIGHT:
         new_x += DELTA_X;
         break;
-    case BTN_L_UP:
-    case BTN_R_UP:
+    case UP:
         new_y -= DELTA_Y;
         break;
-    case BTN_L_DOWN:
-    case BTN_R_DOWN:
+    case DOWN:
         new_y += DELTA_Y;
         break;
     }
-    /* TODO : Game over when hitting wall */
+    // TODO : Game over when hitting wall
     if (new_x < 0 || (new_x + game_cursor.width) > SCREEN_WIDTH)
         return;
     if (new_y < 0 || (new_y + game_cursor.height) > SCREEN_HEIGHT)
         return;
     // TODO : Right now ClearArea will update the screen, which is unnecessary
     //ClearArea(&game_cursor);	
-    /* Move the cursor if */
-    game_cursor.dx = new_x;
-    game_cursor.dy = new_y;
-    /* Clear the oldest block in the snake array */
-    ClearArea(&snake[snake_array_index]);
-    /* Copy the position of the game_cursor to the snake array */
-    snake[snake_array_index].dx = new_x;
-    snake[snake_array_index].dy = new_y;
-    /* Draw the new block i.e. the game_cursor */
-    DrawCursor();
+    // Move the cursor if 
+    players[pi].snake_head.dx = new_x;
+    players[pi].snake_head.dy = new_y;
+    // Clear the oldest block in the snake array
+    ClearArea(&(players[pi].snake[snake_array_index]));
+    // Copy the position of the game_cursor to the snake array
+    players[pi].snake[snake_array_index].dx = new_x;
+    players[pi].snake[snake_array_index].dy = new_y;
+    // Draw the new block, i.e. the game_cursor 
+    SetArea(&players[pi].snake_head, players[pi].color);
     snake_array_index = (snake_array_index + 1) % SNAKE_LENGTH;
+}
+*/
 
+static inline void move_snake(struct Player* p) 
+{
+    int new_x = p->snake_head.dx;
+    int new_y = p->snake_head.dy;
+    switch(p->direction) {
+    case LEFT:
+        new_x -= DELTA_X;
+        break;
+    case RIGHT:
+        new_x += DELTA_X;
+        break;
+    case UP:
+        new_y -= DELTA_Y;
+        break;
+    case DOWN:
+        new_y += DELTA_Y;
+        break;
+    }
+    /* TODO : Game over when hitting wall */
+    if (new_x < 0 || (new_x + p->snake_head.width) > SCREEN_WIDTH)
+        return;
+    if (new_y < 0 || (new_y + p->snake_head.height) > SCREEN_HEIGHT)
+        return;
+    // TODO : Right now ClearArea will update the screen, which is unnecessary
+    /* Move the cursor if */
+    p->snake_head.dx = new_x;
+    p->snake_head.dy = new_y;
+    /* Clear the oldest block in the snake array */
+    ClearArea(&(p->snake[snake_array_index]));
+    /* Copy the position of the game_cursor to the snake array */
+    p->snake[snake_array_index].dx = new_x;
+    p->snake[snake_array_index].dy = new_y;
+    /* Draw the new block, i.e. the game_cursor */
+    SetArea(&(p->snake_head), p->color);
+    
+}
+
+static inline void update_snakes()
+{
+    for (int p = 0; p < NUM_PLAYERS; p++) {
+	move_snake(&players[p]);
+    }
+    /* TODO: Put collision detection here */
+    snake_array_index = (snake_array_index + 1) % SNAKE_LENGTH;
 }
 
 int main()
@@ -247,20 +286,18 @@ int main()
     // the screen
     signal(SIGALRM, &alarm_handler);
     DrawBackground();
-    SetupCursor();
-    DrawCursor();
+    SetupPlayers();
     alarm(1);
     while (1) {
         pause();
         if ( flag_button_pressed ) {
-            // DrawBackground();
-            int cursor_direction = decode_button_state(game_button_state);
-            MoveCursor(cursor_direction);
+	    button_action(game_button_state);
             printf("Button pressed\n");
             flag_button_pressed = 0;
         } 
         if (flag_update_screen_timer) {
             printf("Updating screen\n");
+            update_snakes();
             UpdateScreen();
             flag_update_screen_timer = 0;
         }
