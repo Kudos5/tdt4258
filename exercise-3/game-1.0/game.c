@@ -16,6 +16,7 @@
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
+#define SNAKE_LENGTH 5
 
 static int gp_fd;
 static int fb_fd;
@@ -29,6 +30,8 @@ static uint16_t game_background_colour = 0x0000;
 static uint16_t game_cursor_colour = 0xFFFF;
 
 static struct fb_copyarea game_cursor;
+static struct fb_copyarea snake[SNAKE_LENGTH];
+static unsigned int snake_array_index;
 
 void input_handler(int signum) {
     game_button_state = ioctl(gp_fd, GP_IOCTL_GET_BUTTON_STATE);
@@ -82,11 +85,19 @@ void DrawBackground() {
     ClearScreen();
 }
 
+#define DELTA_X 10
+#define DELTA_Y 10
 void SetupCursor() {
-    game_cursor.width = 10;
-    game_cursor.height = 10;
+    game_cursor.width = DELTA_X;
+    game_cursor.height = DELTA_Y;
     game_cursor.dx = 0;
     game_cursor.dy = 0;
+    for (int i = 0; i < SNAKE_LENGTH; i++) {
+        snake[i].dx = 0;
+        snake[i].dy = 0;
+        snake[i].width = DELTA_X;
+        snake[i].height = DELTA_Y;
+    }
 }
 
 void DrawCursor() {
@@ -111,8 +122,6 @@ static inline int decode_button_state(int button_state)
     }
 }
 
-#define DELTA_X 10
-#define DELTA_Y 10
 static inline void MoveCursor(int cursor_direction)
 {
     int new_x = game_cursor.dx;
@@ -135,7 +144,7 @@ static inline void MoveCursor(int cursor_direction)
         new_y += DELTA_Y;
         break;
     }
-    /* Don't move if we'll cross the boundaries */
+    /* TODO : Game over when hitting wall */
     if (new_x < 0 || (new_x + game_cursor.width) > SCREEN_WIDTH)
         return;
     if (new_y < 0 || (new_y + game_cursor.height) > SCREEN_HEIGHT)
@@ -145,7 +154,14 @@ static inline void MoveCursor(int cursor_direction)
     /* Move the cursor if */
     game_cursor.dx = new_x;
     game_cursor.dy = new_y;
+    /* Clear the oldest block in the snake array */
+    ClearArea(&snake[snake_array_index]);
+    /* Copy the position of the game_cursor to the snake array */
+    snake[snake_array_index].dx = new_x;
+    snake[snake_array_index].dy = new_y;
+    /* Draw the new block i.e. the game_cursor */
     DrawCursor();
+    snake_array_index = (snake_array_index + 1) % SNAKE_LENGTH;
 
 }
 
