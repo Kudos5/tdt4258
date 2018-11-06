@@ -1,8 +1,6 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <linux/fb.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/fcntl.h>
 #include <unistd.h>
@@ -12,6 +10,7 @@
 #include <sys/mman.h>
 #include <linux/fs.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "driver-gamepad-1.0/driver-gamepad.h"
 
@@ -29,22 +28,91 @@ static int flag_update_screen_timer;
 
 static int game_button_state;
 
-static uint16_t game_background_colour = 0x0000;
-static uint16_t game_cursor_colour = 0xFFFF;
+static uint16_t const game_background_colour = 0x0000;
+static uint16_t const game_cursor_colour = 0xFFFF;
+static uint16_t const game_food_colour = 0xF000;
+static int game_food_eaten = 1;
+static int game_cursor_direction;
 
 static struct fb_copyarea game_cursor;
 static struct fb_copyarea snake[SNAKE_LENGTH];
 static unsigned int snake_array_index;
 
+#define FOOD_SIZE 10
+
+// Function declarations
+static void SetArea(struct fb_copyarea * area, uint16_t colour);
+
+static void SetupTimer() {
+    int ret;
+    struct timeval time_val = {
+        .tv_sec = 0,
+        .tv_usec = 250*1000,
+    };
+    struct itimerval itimer_val = {
+        .it_interval = time_val,
+        .it_value = time_val,
+    };
+    if ( (ret = setitimer(ITIMER_REAL, &itimer_val, NULL)) != 0 ) {
+        printf("failed to setitimer\n");
+    }
+}
+
+static int DetectCollision(struct fb_copyarea area_a, struct fb_copyarea area_b) {
+    int a_x0 = area_a.dx;
+    int a_x1 = area_a.dx + area_a.width;;
+    int a_y0 = area_a.dy;
+    int a_y1 = area_a.dy + area_a.height;;
+    int b_x0 = area_b.dx;
+    int b_x1 = area_b.dx + area_a.width;;
+    int b_y0 = area_b.dy;
+    int b_y1 = area_b.dy + area_a.height;;
+    // b is to the left of a
+    if ( b_x1 <= a_x0 ) {
+        return 0;
+    }
+    // a is to the left of b
+    else if ( a_x1 <= b_x0 ) {
+        return 0;
+    }
+    // b is above a
+    if ( b_y1 <= a_y0 ) {
+        return 0;
+    }
+    // a is above b
+    else if ( a_y1 <= b_y0 ) {
+        return 0;
+    }
+    return 1;
+}
+
+static struct fb_copyarea game_food = {
+    .width = FOOD_SIZE,
+    .height = FOOD_SIZE,
+};
+
+void SpawnFood() {
+    int dx = rand() % (SCREEN_WIDTH-FOOD_SIZE);
+    int dy = rand() % (SCREEN_HEIGHT-FOOD_SIZE);
+    // Snap the position to a 10x10 grid
+    dx = (dx/10)*10;
+    dy = (dy/10)*10;
+    game_food.dx = dx;
+    game_food.dy = dy;
+    SetArea(&game_food, game_food_colour);
+}
+
 void UpdateScreen() {
+    if ( game_food_eaten ) {
+        SpawnFood();
+        game_food_eaten = 0;
+    }
 }
 
 void alarm_handler(int signum) {
     // Just to avoid warnings
     signum = signum;
     flag_update_screen_timer = 1;
-    // Trigger a new alarm
-    alarm(1);
 }
 
 void input_handler(int signum) {
@@ -94,7 +162,6 @@ void ClearScreen() {
 }
 
 void DrawBackground() {
-    // TODO: Make this nice, instead of just setting everything to black
     ClearScreen();
 }
 
@@ -197,22 +264,22 @@ int main()
     SetupGamepad();
     // Setup a signal handler for the alarm signal which is used to periodically update
     // the screen
+    SetupTimer();
     signal(SIGALRM, &alarm_handler);
     DrawBackground();
     SetupCursor();
     DrawCursor();
-    alarm(1);
     while (1) {
         pause();
         if ( flag_button_pressed ) {
-            // DrawBackground();
-            int cursor_direction = decode_button_state(game_button_state);
-            MoveCursor(cursor_direction);
-            printf("Button pressed\n");
+            game_cursor_direction = decode_button_state(game_button_state);
             flag_button_pressed = 0;
         } 
         if (flag_update_screen_timer) {
-            printf("Updating screen\n");
+            MoveCursor(game_cursor_direction);
+            if ( DetectCollision(game_food, game_cursor) ) {
+                game_food_eaten = 1;
+            }
             UpdateScreen();
             flag_update_screen_timer = 0;
         }
