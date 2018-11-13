@@ -135,21 +135,20 @@ void DrawBackground() {
 #define BTN_L_DOWN(btn_state) ((btn_state) & 0x08)
 
 static inline void change_direction(struct Player* player, int change_dir) {
-    // RIGHT: Change direction clockwise
-    // LEFT / other: CCW
+    // Don't allow changing direction 180 degrees
     printf("Current dir: %d\n", player->direction);
     switch (player->direction) {
     case LEFT:
-	player->direction = (change_dir == RIGHT ? UP : DOWN);
+	player->direction = (change_dir == RIGHT ? LEFT : change_dir);
 	break;
     case RIGHT:
-	player->direction = (change_dir == RIGHT ? DOWN : UP);
+	player->direction = (change_dir == LEFT ? RIGHT : change_dir);
 	break;
     case UP:
-	player->direction = (change_dir == RIGHT ? RIGHT : LEFT);
+	player->direction = (change_dir == DOWN ? UP : change_dir);
 	break;
     case DOWN:
-	player->direction = (change_dir == RIGHT ? LEFT : RIGHT);
+	player->direction = (change_dir == UP ? DOWN : change_dir);
 	break;
     default:
   	player->direction = DOWN;
@@ -169,10 +168,10 @@ static inline void button_action(int button_state)
 	change_direction(&players[0], LEFT);
     if (BTN_L_RIGHT(newly_pressed))
 	change_direction(&players[0], RIGHT);
-    /* More buttons eventually 
-    if BTN_L_UP(button_state):
-    if BTN_L_DOWN(button_state):
-    */
+    if (BTN_L_UP(newly_pressed))
+	change_direction(&players[0], UP);
+    if (BTN_L_DOWN(newly_pressed))
+	change_direction(&players[0], DOWN);
 } 
 
 /* To be called every clock cycle */
