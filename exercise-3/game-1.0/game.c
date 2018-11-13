@@ -15,7 +15,8 @@
 #include "driver-gamepad-1.0/driver-gamepad.h"
 
 #define NUM_PLAYERS 1	// TODO : Consider making this dynamic, so that # players can be decided in a menu?
-#define SNAKE_LENGTH 5
+#define SNAKE_MAX_LENGTH 20
+#define SNAKE_START_LENGTH 5
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 #define DELTA_X 10
@@ -25,12 +26,12 @@
 enum { UP, DOWN, LEFT, RIGHT };
 
 struct Player {
-    struct fb_copyarea snake_head;		// Position of the snake head
-    struct fb_copyarea snake[SNAKE_LENGTH];	// Array of entire snake (body and head)
+    struct fb_copyarea snake[SNAKE_MAX_LENGTH];	// Array of entire snake (body and head)
+    uint16_t head_index;			// Position of the snake head
+    uint16_t length;				// Array of entire snake (body and head)
     uint16_t color;
     int direction;				// Keep track of which way snake is moving
     int unsigned score;
-    size_t length;
 };
  
 static struct fb_copyarea game_food = {
@@ -54,10 +55,6 @@ static uint16_t const game_background_colour = 0x0000;
 static uint16_t const game_cursor_colour = 0xFFFF;
 static uint16_t const game_food_colour = 0xF000;
 static int game_food_eaten = 1;
-// static int game_cursor_direction;
-
-static unsigned int snake_array_index;
-
 
 // Function declarations
 static void SetArea(struct fb_copyarea * area, uint16_t colour);
@@ -115,18 +112,20 @@ static int DetectCollision(struct fb_copyarea * area_a, struct fb_copyarea * are
 static int DetectCollisionWithEdgeOfScreen() {
     for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
         struct Player * player = &players[i];
+        printf("%d\n", player->direction);
         switch (player->direction) {
+            struct fb_copyarea * snake_head = &(player->snake[player->head_index]);
             case UP:
-                return player->snake_head.dy == 0;
+                return snake_head->dy == 0;
                 break;
             case DOWN:
-                return player->snake_head.dy >= (SCREEN_HEIGHT - DELTA_Y);
+                return snake_head->dy >= (SCREEN_HEIGHT - DELTA_Y);
                 break;
             case LEFT:
-                return player->snake_head.dx == 0;
+                return snake_head->dx == 0;
                 break;
             case RIGHT:
-                return player->snake_head.dx >= (SCREEN_WIDTH - DELTA_X);
+                return snake_head->dx >= (SCREEN_WIDTH - DELTA_X);
                 break;
         };
     }
@@ -136,14 +135,14 @@ static int DetectCollisionWithEdgeOfScreen() {
 static int DetectCollisionWithSelf() {
     for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
         struct Player * player = &players[i];
+        struct fb_copyarea * snake_head = &player->snake[player->head_index];
         for ( size_t j = 0; j < player->length; ++j ) {
             // Make sure to skip the head
-            if ( player->snake[j] == player->snake_head ) {
+            if ( j == player->head_index ) {
                 continue;
             }
-            if ( DetectCollision(&player->snake_head, &player->snake[j]) ) {
-                printf("Collided with self\n");
-                // return 1;
+            if ( DetectCollision(snake_head, &player->snake[j]) ) {
+                return 1;
             }
         }
     }
@@ -157,7 +156,9 @@ static int DetectCollisionBetweenSnakes() {
 
 static int DetectCollisionWithFood(size_t * player_id) {
     for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
-        if ( DetectCollision(&players[i].snake_head, &game_food) ) {
+        struct Player * player = &players[i];
+        struct fb_copyarea * snake_head = &player->snake[player->head_index];
+        if ( DetectCollision(snake_head, &game_food) ) {
             *player_id = i;
             return 1;
         }
@@ -188,24 +189,23 @@ void alarm_handler(int signum) {
     signum = signum;
     flag_update_screen_timer = 1;
 }
+    
+static struct Player players[NUM_PLAYERS];
+
 void SetupPlayers() {
-    /* This one looks messy when using fb_copyareas for all snake blocks, 
-     * but I think it makes things easier other places in the code  */
     for (int p = 0; p < NUM_PLAYERS; p++) {
-	    players[p].snake_head.width = DELTA_X;
-	    players[p].snake_head.height = DELTA_Y;
-	    players[p].snake_head.dx = 0;	/* TODO : Make the position random */
-	    players[p].snake_head.dy = 0;	/* OR just make each snake start in its own corner */
+	    players[p].head_index = 0;
+	    players[p].length = SNAKE_START_LENGTH;
 	/* Initialize snake blocks */
-        for (int sb = 0; sb < SNAKE_LENGTH; sb++) {
+        for (int sb = 0; sb < SNAKE_MAX_LENGTH; sb++) {
             players[p].snake[sb].dx = 0;	// TODO : Do something smart here, to avoid...
             players[p].snake[sb].dy = 0;	// ...overwriting blocks that we don't want to clear
-            players[p].snake[sb].width = DELTA_X;
-            players[p].snake[sb].height = DELTA_Y;
+            players[p].snake[sb].width = DELTA_X;  // Also, consider making the position random.
+            players[p].snake[sb].height = DELTA_Y; // Or just make eash snake start in its own corner
         }
 	players[p].direction = DOWN;
 	players[p].color = 0xFFFF;
-    players[p].length = SNAKE_LENGTH;
+    players[p].length = SNAKE_START_LENGTH;
     }
 }
 
@@ -303,53 +303,11 @@ static inline void button_action(int button_state)
 	change_direction(&players[0], DOWN);
 } 
 
-/* To be called every clock cycle */
-/** pi - player index
- **/
-/*
-static inline void MoveCursor(int pi)
-{
-    int new_x = players[pi].snake_head.dx;
-    int new_y = players[pi].snake_head.dy;
-    switch(players[pi].direction) {
-    case LEFT:
-        new_x -= DELTA_X;
-        break;
-    case RIGHT:
-        new_x += DELTA_X;
-        break;
-    case UP:
-        new_y -= DELTA_Y;
-        break;
-    case DOWN:
-        new_y += DELTA_Y;
-        break;
-    }
-    // TODO : Game over when hitting wall
-    if (new_x < 0 || (new_x + game_cursor.width) > SCREEN_WIDTH)
-        return;
-    if (new_y < 0 || (new_y + game_cursor.height) > SCREEN_HEIGHT)
-        return;
-    // TODO : Right now ClearArea will update the screen, which is unnecessary
-    //ClearArea(&game_cursor);	
-    // Move the cursor if 
-    players[pi].snake_head.dx = new_x;
-    players[pi].snake_head.dy = new_y;
-    // Clear the oldest block in the snake array
-    ClearArea(&(players[pi].snake[snake_array_index]));
-    // Copy the position of the game_cursor to the snake array
-    players[pi].snake[snake_array_index].dx = new_x;
-    players[pi].snake[snake_array_index].dy = new_y;
-    // Draw the new block, i.e. the game_cursor 
-    SetArea(&players[pi].snake_head, players[pi].color);
-    snake_array_index = (snake_array_index + 1) % SNAKE_LENGTH;
-}
-*/
 
 static inline void move_snake(struct Player* p) 
 {
-    int new_x = p->snake_head.dx;
-    int new_y = p->snake_head.dy;
+    int new_x = p->snake[p->head_index].dx;
+    int new_y = p->snake[p->head_index].dy;
     switch(p->direction) {
     case LEFT:
         new_x -= DELTA_X;
@@ -365,21 +323,20 @@ static inline void move_snake(struct Player* p)
         break;
     }
     /* TODO : Game over when hitting wall */
-    if (new_x < 0 || (new_x + p->snake_head.width) > SCREEN_WIDTH)
+    if (new_x < 0 || (new_x + p->snake[p->head_index].width) > SCREEN_WIDTH)
         return;
-    if (new_y < 0 || (new_y + p->snake_head.height) > SCREEN_HEIGHT)
+    if (new_y < 0 || (new_y + p->snake[p->head_index].height) > SCREEN_HEIGHT)
         return;
-    // TODO : Right now ClearArea will update the screen, which is unnecessary
-    /* Move the cursor if */
-    p->snake_head.dx = new_x;
-    p->snake_head.dy = new_y;
+    /* Set head to the oldest block (for overwriting) */
+    p->head_index = (p->head_index + 1) % p->length;
     /* Clear the oldest block in the snake array */
-    ClearArea(&(p->snake[snake_array_index]));
-    /* Copy the position of the game_cursor to the snake array */
-    p->snake[snake_array_index].dx = new_x;
-    p->snake[snake_array_index].dy = new_y;
+    // TODO : Right now ClearArea will update the screen, which is unnecessary
+    ClearArea(&(p->snake[p->head_index]));
+    /* Update the snake head */
+    p->snake[p->head_index].dx = new_x;
+    p->snake[p->head_index].dy = new_y;
     /* Draw the new block, i.e. the game_cursor */
-    SetArea(&(p->snake_head), p->color);
+    SetArea(&(p->snake[p->head_index]), p->color);
     
 }
 
@@ -389,7 +346,27 @@ static inline void update_snakes()
         move_snake(&players[p]);
     }
     /* TODO: Put collision detection here */
-    snake_array_index = (snake_array_index + 1) % SNAKE_LENGTH;
+}
+
+
+int SnakeGrow(struct Player* p) {
+    /* Victory! Don't grow */
+    if (++(p->length) >= SNAKE_MAX_LENGTH) {
+        return 0;
+    }
+    return 1;
+    
+    /*
+    if (p->length >= SNAKE_MAX_LENGTH){
+	// victory
+    }
+    // If head is last block, everything's good
+    if (p->head_index+2 >= p->length-1) 
+	return;
+    // Unless head is the last block, shift everything right of the head to the right
+    for (uint16_t i = p->length-1; i != p->head_index+2; i--) {
+	p->snake[i] = p->snake[i-1];
+    } */
 }
 
 
@@ -432,14 +409,17 @@ int main()
         if (flag_update_screen_timer) {
             update_snakes();
             if ( DetectCollisionWithEdgeOfScreen() ) {
+                printf("Collided with edge\n");
                 GameOver();
                 return 0;
             }
             if ( DetectCollisionWithSelf() ) {
+                printf("Collided with self\n");
                 GameOver();
                 return 0;
             }
             if ( DetectCollisionBetweenSnakes() ) {
+                printf("Collision with other player\n");
                 GameOver();
                 return 0;
             }
@@ -448,6 +428,12 @@ int main()
                 ++players[player_id].score;
                 game_food_eaten = 1;
                 PrintState();
+                /* If snake has reached SNAKE_MAX_LENGTH*/
+                if (!SnakeGrow(&players[0])) {
+                    printf("You win\n");
+                    GameOver();
+                    break;
+                }
             }
             UpdateScreen();
             flag_update_screen_timer = 0;
