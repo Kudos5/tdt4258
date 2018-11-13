@@ -365,7 +365,7 @@ int main()
             update_snakes();
             UpdateScreen();
             flag_update_screen_timer = 0;
-            if ( DetectCollision(game_food, game_cursor) ) {
+            if ( DetectCollision(game_food, players[0].snake_head) ) {
                 game_food_eaten = 1;
             }
         }
