@@ -118,6 +118,7 @@ enum { UP, DOWN, LEFT, RIGHT };
 struct Player {
     struct fb_copyarea snake[SNAKE_MAX_LENGTH];	// Array of entire snake (body and head)
     uint16_t head_index;			// Position of the snake head
+    uint16_t tail_index;			// Position of the snake tail
     uint16_t length;				// Array of entire snake (body and head)
     uint16_t color;
     int direction;				// Keep track of which way snake is moving
@@ -127,8 +128,9 @@ static struct Player players[NUM_PLAYERS];
 
 void SetupPlayers() {
     for (int p = 0; p < NUM_PLAYERS; p++) {
-	    players[p].head_index = 0;
 	    players[p].length = SNAKE_START_LENGTH;
+	    players[p].tail_index = 0;
+	    players[p].head_index = SNAKE_START_LENGTH - 1;
 	/* Initialize snake blocks */
         for (int sb = 0; sb < SNAKE_MAX_LENGTH; sb++) {
             players[p].snake[sb].dx = 0;	// TODO : Do something smart here, to avoid...
@@ -191,7 +193,6 @@ void DrawBackground() {
     ClearScreen();
 }
 
-
 #define BTN_L_LEFT(btn_state) ((btn_state) & 0x01)
 #define BTN_L_UP(btn_state) ((btn_state) & 0x02)
 #define BTN_L_RIGHT(btn_state) ((btn_state) & 0x04)
@@ -220,8 +221,7 @@ static inline void change_direction(struct Player* player, int change_dir) {
 }
 
 /* TODO? Make button to player mapping dynamic  */
-static inline void button_action(int button_state)
-{
+static inline void button_action(int button_state) {
     static int prev_button_state = 0xFF;
 
     int newly_pressed = (prev_button_state ^ button_state) & prev_button_state;
@@ -237,9 +237,7 @@ static inline void button_action(int button_state)
 	change_direction(&players[0], DOWN);
 } 
 
-
-static inline void move_snake(struct Player* p) 
-{
+static inline void move_snake(struct Player* p) {
     int new_x = p->snake[p->head_index].dx;
     int new_y = p->snake[p->head_index].dy;
     switch(p->direction) {
@@ -261,12 +259,14 @@ static inline void move_snake(struct Player* p)
         return;
     if (new_y < 0 || (new_y + p->snake[p->head_index].height) > SCREEN_HEIGHT)
         return;
-    /* Set head to the oldest block (for overwriting) */
-    p->head_index = (p->head_index + 1) % p->length;
-    /* Clear the oldest block in the snake array */
+
+    /* Clear the tail block in the snake array */
     // TODO : Right now ClearArea will update the screen, which is unnecessary
-    ClearArea(&(p->snake[p->head_index]));
-    /* Update the snake head */
+    ClearArea(&(p->snake[p->tail_index]));
+
+    /* Update snake head (index and block) and tail (index) */
+    p->tail_index = (p->tail_index + 1) % SNAKE_MAX_LENGTH;
+    p->head_index = (p->head_index + 1) % SNAKE_MAX_LENGTH;
     p->snake[p->head_index].dx = new_x;
     p->snake[p->head_index].dy = new_y;
     /* Draw the new block, i.e. the game_cursor */
@@ -274,20 +274,29 @@ static inline void move_snake(struct Player* p)
     
 }
 
-static inline void update_snakes()
-{
+static inline void update_snakes() {
     for (int p = 0; p < NUM_PLAYERS; p++) {
 	move_snake(&players[p]);
     }
     /* TODO: Put collision detection here */
 }
 
-
 int SnakeGrow(struct Player* p) {
     /* Victory! Don't grow */
     if (++(p->length) >= SNAKE_MAX_LENGTH)
 	return 0;
     
+    printf("tail_p: %d \n", p->tail_index);
+    /* Set tail to tail-1, so that we don't overwrite the tail on next move_snake */
+    p->tail_index = ( p->tail_index == 0 ? SNAKE_MAX_LENGTH-1 : p->tail_index-1 );
+    printf("tail: %d \n", p->tail_index);
+/*
+    if (p->tail_index == 0)
+	p->tail_index = p->length - 1;
+    else
+	p->tail_index--;
+*/   
+    return 1;
     /*
     if (p->length >= SNAKE_MAX_LENGTH){
 	// victory
@@ -338,8 +347,10 @@ int main()
             if ( DetectCollision(game_food, players[0].snake[players[0].head_index]) ) {
                 game_food_eaten = 1;
 		/* If snake has reached SNAKE_MAX_LENGTH*/
-		if (!SnakeGrow(&players[0]))
+		if (!SnakeGrow(&players[0])){
+		    printf("Victory");
 		    break;
+		}
             }
         }
     }
