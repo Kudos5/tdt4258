@@ -130,7 +130,7 @@ void SetupPlayers() {
 	    players[p].head_index = 0;
 	    players[p].length = SNAKE_START_LENGTH;
 	/* Initialize snake blocks */
-        for (int sb = 0; sb < SNAKE_START_LENGTH; sb++) {
+        for (int sb = 0; sb < SNAKE_MAX_LENGTH; sb++) {
             players[p].snake[sb].dx = 0;	// TODO : Do something smart here, to avoid...
             players[p].snake[sb].dy = 0;	// ...overwriting blocks that we don't want to clear
             players[p].snake[sb].width = DELTA_X;  // Also, consider making the position random.
@@ -261,13 +261,12 @@ static inline void move_snake(struct Player* p)
         return;
     if (new_y < 0 || (new_y + p->snake[p->head_index].height) > SCREEN_HEIGHT)
         return;
-    // TODO : Right now ClearArea will update the screen, which is unnecessary
-    /* Move the cursor if */
-    p->snake[p->head_index].dx = new_x;
-    p->snake[p->head_index].dy = new_y;
+    /* Set head to the oldest block (for overwriting) */
+    p->head_index = (p->head_index + 1) % p->length;
     /* Clear the oldest block in the snake array */
+    // TODO : Right now ClearArea will update the screen, which is unnecessary
     ClearArea(&(p->snake[p->head_index]));
-    /* Copy the position of the game_cursor to the snake array */
+    /* Update the snake head */
     p->snake[p->head_index].dx = new_x;
     p->snake[p->head_index].dy = new_y;
     /* Draw the new block, i.e. the game_cursor */
@@ -277,13 +276,29 @@ static inline void move_snake(struct Player* p)
 
 static inline void update_snakes()
 {
-    struct Player* pl;
     for (int p = 0; p < NUM_PLAYERS; p++) {
-	pl = &players[p];
-	move_snake(pl);
-	pl->head_index = (pl->head_index + 1) % pl->length;
+	move_snake(&players[p]);
     }
     /* TODO: Put collision detection here */
+}
+
+
+int SnakeGrow(struct Player* p) {
+    /* Victory! Don't grow */
+    if (++(p->length) >= SNAKE_MAX_LENGTH)
+	return 0;
+    
+    /*
+    if (p->length >= SNAKE_MAX_LENGTH){
+	// victory
+    }
+    // If head is last block, everything's good
+    if (p->head_index+2 >= p->length-1) 
+	return;
+    // Unless head is the last block, shift everything right of the head to the right
+    for (uint16_t i = p->length-1; i != p->head_index+2; i--) {
+	p->snake[i] = p->snake[i-1];
+    } */
 }
 
 int main()
@@ -322,6 +337,9 @@ int main()
             flag_update_screen_timer = 0;
             if ( DetectCollision(game_food, players[0].snake[players[0].head_index]) ) {
                 game_food_eaten = 1;
+		/* If snake has reached SNAKE_MAX_LENGTH*/
+		if (!SnakeGrow(&players[0]))
+		    break;
             }
         }
     }
