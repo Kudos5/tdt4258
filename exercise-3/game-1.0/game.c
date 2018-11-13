@@ -20,6 +20,25 @@
 #define SCREEN_HEIGHT 240
 #define DELTA_X 10
 #define DELTA_Y 10
+#define FOOD_SIZE 10
+
+enum { UP, DOWN, LEFT, RIGHT };
+
+struct Player {
+    struct fb_copyarea snake_head;		// Position of the snake head
+    struct fb_copyarea snake[SNAKE_LENGTH];	// Array of entire snake (body and head)
+    uint16_t color;
+    int direction;				// Keep track of which way snake is moving
+    int unsigned score;
+    size_t length;
+};
+ 
+static struct fb_copyarea game_food = {
+    .width = FOOD_SIZE,
+    .height = FOOD_SIZE,
+};
+   
+static struct Player players[NUM_PLAYERS];
 
 static int gp_fd;
 static int fb_fd;
@@ -35,14 +54,20 @@ static uint16_t const game_background_colour = 0x0000;
 static uint16_t const game_cursor_colour = 0xFFFF;
 static uint16_t const game_food_colour = 0xF000;
 static int game_food_eaten = 1;
-static int game_cursor_direction;
+// static int game_cursor_direction;
 
 static unsigned int snake_array_index;
 
-#define FOOD_SIZE 10
 
 // Function declarations
 static void SetArea(struct fb_copyarea * area, uint16_t colour);
+
+static void GameOver() {
+    printf("Game over\n");
+    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
+        printf("Player %u score: %u\n", i, players[i].score);
+    }
+}
 
 static void SetupTimer() {
     int ret;
@@ -59,15 +84,15 @@ static void SetupTimer() {
     }
 }
 
-static int DetectCollision(struct fb_copyarea area_a, struct fb_copyarea area_b) {
-    int a_x0 = area_a.dx;
-    int a_x1 = area_a.dx + area_a.width;;
-    int a_y0 = area_a.dy;
-    int a_y1 = area_a.dy + area_a.height;;
-    int b_x0 = area_b.dx;
-    int b_x1 = area_b.dx + area_a.width;;
-    int b_y0 = area_b.dy;
-    int b_y1 = area_b.dy + area_a.height;;
+static int DetectCollision(struct fb_copyarea * area_a, struct fb_copyarea * area_b) {
+    int a_x0 = area_a->dx;
+    int a_x1 = area_a->dx + area_a->width;;
+    int a_y0 = area_a->dy;
+    int a_y1 = area_a->dy + area_a->height;;
+    int b_x0 = area_b->dx;
+    int b_x1 = area_b->dx + area_a->width;;
+    int b_y0 = area_b->dy;
+    int b_y1 = area_b->dy + area_a->height;;
     // b is to the left of a
     if ( b_x1 <= a_x0 ) {
         return 0;
@@ -87,12 +112,60 @@ static int DetectCollision(struct fb_copyarea area_a, struct fb_copyarea area_b)
     return 1;
 }
 
-static struct fb_copyarea game_food = {
-    .width = FOOD_SIZE,
-    .height = FOOD_SIZE,
-};
+static int DetectCollisionWithEdgeOfScreen() {
+    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
+        struct Player * player = &players[i];
+        switch (player->direction) {
+            case UP:
+                return player->snake_head.dy == 0;
+                break;
+            case DOWN:
+                return player->snake_head.dy >= (SCREEN_HEIGHT - DELTA_Y);
+                break;
+            case LEFT:
+                return player->snake_head.dx == 0;
+                break;
+            case RIGHT:
+                return player->snake_head.dx >= (SCREEN_WIDTH - DELTA_X);
+                break;
+        };
+    }
+    return 0;
+}
 
+static int DetectCollisionWithSelf() {
+    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
+        struct Player * player = &players[i];
+        for ( size_t j = 0; j < player->length; ++j ) {
+            // Make sure to skip the head
+            if ( player->snake[j] == player->snake_head ) {
+                continue;
+            }
+            if ( DetectCollision(&player->snake_head, &player->snake[j]) ) {
+                printf("Collided with self\n");
+                // return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int DetectCollisionBetweenSnakes() {
+    // TODO
+    return 0;
+}
+
+static int DetectCollisionWithFood(size_t * player_id) {
+    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
+        if ( DetectCollision(&players[i].snake_head, &game_food) ) {
+            *player_id = i;
+            return 1;
+        }
+    }
+    return 0;
+}
 void SpawnFood() {
+    // TODO: Do not spawn food on top of the snake
     int dx = rand() % (SCREEN_WIDTH-FOOD_SIZE);
     int dy = rand() % (SCREEN_HEIGHT-FOOD_SIZE);
     // Snap the position to a 10x10 grid
@@ -115,17 +188,6 @@ void alarm_handler(int signum) {
     signum = signum;
     flag_update_screen_timer = 1;
 }
-
-enum { UP, DOWN, LEFT, RIGHT };
-struct Player {
-    struct fb_copyarea snake_head;		// Position of the snake head
-    struct fb_copyarea snake[SNAKE_LENGTH];	// Array of entire snake (body and head)
-    uint16_t color;
-    int direction;				// Keep track of which way snake is moving
-};
-    
-static struct Player players[NUM_PLAYERS];
-
 void SetupPlayers() {
     /* This one looks messy when using fb_copyareas for all snake blocks, 
      * but I think it makes things easier other places in the code  */
@@ -143,6 +205,7 @@ void SetupPlayers() {
         }
 	players[p].direction = DOWN;
 	players[p].color = 0xFFFF;
+    players[p].length = SNAKE_LENGTH;
     }
 }
 
@@ -204,7 +267,6 @@ void DrawBackground() {
 
 static inline void change_direction(struct Player* player, int change_dir) {
     // Don't allow changing direction 180 degrees
-    printf("Current dir: %d\n", player->direction);
     switch (player->direction) {
     case LEFT:
 	player->direction = (change_dir == RIGHT ? LEFT : change_dir);
@@ -221,7 +283,6 @@ static inline void change_direction(struct Player* player, int change_dir) {
     default:
   	player->direction = DOWN;
     }
-    printf("New dir: %d\n", player->direction);
 }
 
 /* TODO? Make button to player mapping dynamic  */
@@ -325,15 +386,22 @@ static inline void move_snake(struct Player* p)
 static inline void update_snakes()
 {
     for (int p = 0; p < NUM_PLAYERS; p++) {
-	move_snake(&players[p]);
+        move_snake(&players[p]);
     }
     /* TODO: Put collision detection here */
     snake_array_index = (snake_array_index + 1) % SNAKE_LENGTH;
 }
 
+
+void PrintState() {
+    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
+        printf("Player %u score: %u\n", i, players[i].score);
+    }
+}
+
 int main()
 {
-	printf("Hello World, I'm game!\n");
+	printf("Game started\n");
     int ret;
 
     fb_fd = open("/dev/fb0", O_RDWR);
@@ -363,11 +431,26 @@ int main()
         } 
         if (flag_update_screen_timer) {
             update_snakes();
+            if ( DetectCollisionWithEdgeOfScreen() ) {
+                GameOver();
+                return 0;
+            }
+            if ( DetectCollisionWithSelf() ) {
+                GameOver();
+                return 0;
+            }
+            if ( DetectCollisionBetweenSnakes() ) {
+                GameOver();
+                return 0;
+            }
+            size_t player_id;
+            if ( DetectCollisionWithFood(&player_id) ) {
+                ++players[player_id].score;
+                game_food_eaten = 1;
+                PrintState();
+            }
             UpdateScreen();
             flag_update_screen_timer = 0;
-            if ( DetectCollision(game_food, players[0].snake_head) ) {
-                game_food_eaten = 1;
-            }
         }
     }
 
