@@ -264,23 +264,24 @@ void DrawBackground() {
 #define BTN_L_RIGHT(btn_state) ((btn_state) & 0x04)
 #define BTN_L_DOWN(btn_state) ((btn_state) & 0x08)
 
+static int new_direction;
 static inline void change_direction(struct Player* player, int change_dir) {
     // Don't allow changing direction 180 degrees
     switch (player->direction) {
     case LEFT:
-	player->direction = (change_dir == RIGHT ? LEFT : change_dir);
+	new_direction = (change_dir == RIGHT ? LEFT : change_dir);
 	break;
     case RIGHT:
-	player->direction = (change_dir == LEFT ? RIGHT : change_dir);
+	new_direction = (change_dir == LEFT ? RIGHT : change_dir);
 	break;
     case UP:
-	player->direction = (change_dir == DOWN ? UP : change_dir);
+	new_direction = (change_dir == DOWN ? UP : change_dir);
 	break;
     case DOWN:
-	player->direction = (change_dir == UP ? DOWN : change_dir);
+	new_direction = (change_dir == UP ? DOWN : change_dir);
 	break;
     default:
-  	player->direction = DOWN;
+  	new_direction = DOWN;
     }
 }
 
@@ -304,6 +305,7 @@ static inline void button_action(int button_state) {
 static inline void move_snake(struct Player* p) {
     int new_x = p->snake[p->head_index].dx;
     int new_y = p->snake[p->head_index].dy;
+    p->direction = new_direction;
     switch(p->direction) {
     case LEFT:
         new_x -= DELTA_X;
