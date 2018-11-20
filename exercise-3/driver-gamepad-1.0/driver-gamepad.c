@@ -12,29 +12,10 @@
 #include <linux/signal.h>
 
 #include "driver-gamepad.h"
+#include "gpio.h"
 
 #define DRIVER_NAME "gamepad"
 
-#define CMU_BASE2 0x400c8000
-#define CMU_HFPERCLKEN0  ((volatile __u32*)(CMU_BASE2 + 0x044))
-#define CMU2_HFPERCLKEN0_GPIO   (1 << 13)
-
-#define GPIO_BASE    0x40006000
-#define GPIO_PA_BASE 0x40006000
-#define GPIO_PC_BASE 0x40006048
-
-#define GPIO_PC_MODEL    ((volatile uint32_t*)(GPIO_PC_BASE + 0x04))
-#define GPIO_PC_DOUT     ((volatile uint32_t*)(GPIO_PC_BASE + 0x0c))
-#define GPIO_PC_DIN      ((volatile uint32_t*)(GPIO_PC_BASE + 0x1c))
-
-#define GPIO_PA_DOUT     ((volatile uint32_t*)(GPIO_PA_BASE + 0x0c))
-#define GPIO_PA_MODEH    ((volatile uint32_t*)(GPIO_PA_BASE + 0x08))
-
-#define GPIO_EXTIPSELL ((volatile uint32_t*)(GPIO_BASE + 0x100))
-#define GPIO_EXTIFALL  ((volatile uint32_t*)(GPIO_BASE + 0x10c))
-#define GPIO_IEN       ((volatile uint32_t*)(GPIO_BASE + 0x110))
-#define GPIO_IF        ((volatile uint32_t*)(GPIO_BASE + 0x114))
-#define GPIO_IFC       ((volatile uint32_t*)(GPIO_BASE + 0x11c))
 // Module variables
 int long unsigned gp_owner_pid = -1;
 static struct class * gp_cl;
@@ -45,7 +26,8 @@ dev_t gp_dev_number;
 static struct fasync_struct * gp_async_queue;
 static int unsigned gp_button_state;
 
-static void setupGPIO(void) {
+static void setupGPIO(volatile void * gpio_base)
+{
     // TODO: Implement without hardcoding adresses.
     // Is it possible to get all adresses, or do we have to hardcode offsets?
     int long unsigned current_value;
@@ -54,44 +36,66 @@ static void setupGPIO(void) {
 	// Enable buttons
 	// Set GPIO PC to input
     new_value = 0x33333333;
-    iowrite32(new_value, GPIO_PC_MODEL);
+    iowrite32(new_value, gpio_base + GPIO_PC_MODEL);
 
 	// Enable internal pullup
     new_value = 0xFF;
-    iowrite32(new_value, GPIO_PC_DOUT);
+    iowrite32(new_value, gpio_base + GPIO_PC_DOUT);
 
 	// Enable interrupts for GPIO C when its state changes
     new_value = 0x22222222;
-    iowrite32(new_value, GPIO_EXTIPSELL);
+    iowrite32(new_value, gpio_base + GPIO_EXTIPSELL);
 
 	// Set up the GPIO to interrupt when a bit changes from 1 to 0 (button pressed)
     new_value = 0xFF;
-    iowrite32(new_value, GPIO_EXTIFALL);
+    iowrite32(new_value, gpio_base + GPIO_EXTIFALL);
 
 	// Set up interrupt generation
-    current_value = ioread32(GPIO_IEN);
+    current_value = ioread32(gpio_base + GPIO_IEN);
     new_value = current_value | 0xFF;
-    iowrite32(new_value, GPIO_IEN);
+    iowrite32(new_value, gpio_base + GPIO_IEN);
 
 	// Clear interrupt flags to avoid interrupt on startup
-    current_value = ioread32(GPIO_IFC);
-    new_value = current_value | ioread32(GPIO_IF);
-    iowrite32(new_value, GPIO_IFC);
+    current_value = ioread32(gpio_base + GPIO_IFC);
+    new_value = current_value | ioread32(gpio_base + GPIO_IF);
+    iowrite32(new_value, gpio_base + GPIO_IFC);
 }
+
+/*
+static void PrintPDev(struct platform_device * dev) {
+    int i;
+    struct resource * res;
+    printk("gp_probe called\n");
+    printk("gamepad driver registered to device with following information:\n");
+    printk("name: %s\n", dev->name);
+    printk("id: %d\n", dev->id);
+    printk("num resources: %d\n", dev->num_resources);
+    printk("Resources:\n");
+    for ( i = 0; i < dev->num_resources; ++i ) {
+        res = platform_get_resource(dev, IORESOURCE_MEM, i);
+        printk("Name: %s\n", res->name);
+        printk("Start: %#08X\n", res->start);
+        printk("End: %#08X\n", res->end);
+    }
+}
+*/
 
 static irqreturn_t isr_store_button_state(int irq, void * dev) {
     int long unsigned current_value;
     int long unsigned new_value;
 
+    volatile void * gpio_base = 
+        (volatile void *)platform_get_resource(dev, IORESOURCE_MEM, 0)->start;
+
 	// Clear the interrupt to avoid repeating interrupts
-    current_value = ioread32(GPIO_IFC);
-    new_value = current_value | ioread32(GPIO_IF);
-    iowrite32(new_value, GPIO_IFC);
+    current_value = ioread32(gpio_base + GPIO_IFC);
+    new_value = current_value | ioread32(gpio_base + GPIO_IF);
+    iowrite32(new_value, gpio_base + GPIO_IFC);
 
     // Store the button state
-    gp_button_state = ioread32(GPIO_PC_DIN);
+    gp_button_state = ioread32(gpio_base + GPIO_PC_DIN);
 
-    // Send a signal
+    // Send a signal to other processes that a button was pressed
     kill_fasync(&gp_async_queue, SIGIO, POLL_IN);
     return IRQ_HANDLED;
 }
@@ -129,25 +133,6 @@ static struct file_operations gp_fops = {
     .fasync = gp_fasync,
 };
 
-/*
-static void PrintPDev(struct platform_device * dev) {
-    int i;
-    struct resource * res;
-    printk("gp_probe called\n");
-    printk("gamepad driver registered to device with following information:\n");
-    printk("name: %s\n", dev->name);
-    printk("id: %d\n", dev->id);
-    printk("num resources: %d\n", dev->num_resources);
-    printk("Resources:\n");
-    for ( i = 0; i < dev->num_resources; ++i ) {
-        res = platform_get_resource(dev, IORESOURCE_MEM, i);
-        printk("Name: %s\n", res->name);
-        printk("Start: %#08X\n", res->start);
-        printk("End: %#08X\n", res->end);
-    }
-}
-*/
-
 static int RegisterChrDev(void) {
     int ret;
     if ( (ret = alloc_chrdev_region(&gp_dev_number, 0, 1, DRIVER_NAME)) < 0 ) {
@@ -176,14 +161,16 @@ static int gp_probe(struct platform_device * p_dev_ptr) {
     int gpio_even_irq;
     int gpio_odd_irq;
     struct resource * res;
+    int gpio_base_address;
     RegisterChrDev();
 
     // Get info about GPIO
     res = platform_get_resource(p_dev_ptr, IORESOURCE_MEM, 0);
+    gpio_base_address = res->start;
     // Get GPIO IRQ number
     gpio_even_irq = platform_get_irq(p_dev_ptr, 0);
     gpio_odd_irq = platform_get_irq(p_dev_ptr, 1);
-    setupGPIO();
+    setupGPIO((volatile void *)gpio_base_address);
     // Register an interrupt
     if (request_irq(gpio_even_irq, isr_store_button_state, IRQF_SHARED, "gpio_even", p_dev_ptr)) {
         printk(KERN_ERR "rtc: cannot register IRQ %d\n", gpio_even_irq);
