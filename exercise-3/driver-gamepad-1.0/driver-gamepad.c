@@ -86,27 +86,32 @@ static void setupGPIO(void) {
     // TODO: Remove usage of LEDs
     // Enable LEDs PA12, PA13 and PA14 for testing
     // We must be careful not to change any of the configurations for these registers
+    /*
     current_value = ioread32(GPIO_PA_MODEH);
     new_value = current_value | 0x05550000;
     iowrite32(new_value, GPIO_PA_MODEH);
+    */
 
     // turn on LEDs D4-D8 (LEDs are active low)
+    /*
     current_value = ioread32(GPIO_PA_DOUT);
     new_value = current_value & ~(1 << 12);
     new_value = new_value & ~(1 << 13);
     new_value = new_value & ~(1 << 14);
     iowrite32(new_value, GPIO_PA_DOUT);
-
+    */
 }
 
 static irqreturn_t ToggleLeds(int irq, void * dev) {
     int long unsigned current_value;
     int long unsigned new_value;
+    /*
     current_value = ioread32(GPIO_PA_DOUT);
     new_value = current_value ^ (1 << 12);
     new_value = new_value ^ (1 << 13);
     new_value = new_value ^ (1 << 14);
     iowrite32(new_value, GPIO_PA_DOUT);
+    */
 
 	// Clear the interrupt to avoid repeating interrupts
     current_value = ioread32(GPIO_IFC);
@@ -219,7 +224,7 @@ static int gp_probe(struct platform_device * p_dev_ptr) {
         printk(KERN_ERR "rtc: cannot register IRQ %d\n", gpio_even_irq);
         return -EIO;
     }
-    if (request_irq(gpio_odd_irq, ToggleLeds, IRQF_SHARED, "gpio_even", p_dev_ptr)) {
+    if (request_irq(gpio_odd_irq, ToggleLeds, IRQF_SHARED, "gpio_odd", p_dev_ptr)) {
         printk(KERN_ERR "rtc: cannot register IRQ %d\n", gpio_odd_irq);
         return -EIO;
     }
