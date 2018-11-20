@@ -264,7 +264,6 @@ int main()
             }
             if ( detect_collision_food() ) {
                 game_food_eaten = 1;
-                print_state();
                 /* If snake has reached SNAKE_MAX_LENGTH*/
                 if (!snake_grow()) {
                     printf("You win\n");
@@ -275,6 +274,7 @@ int main()
                     game_timer_ms = GAME_TIMER_MAX - get_score()*10;
                     setup_timer(game_timer_ms);
                 }
+                print_state();
             }
             update_screen();
             flag_update_screen_timer = 0;

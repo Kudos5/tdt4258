@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#define SNAKE_MAX_LENGTH 10
+#define SNAKE_MAX_LENGTH 100
 #define SNAKE_START_LENGTH 5
 #define SNAKE_COLOR 0xFFFF
 #define DELTA_X 10
