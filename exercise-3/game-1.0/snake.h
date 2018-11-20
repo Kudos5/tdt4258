@@ -12,15 +12,13 @@
 
 enum { UP, DOWN, LEFT, RIGHT };
 
-
-
 uint16_t get_snake_length();
 uint16_t get_snake_direction();
-struct fb_copyarea* get_snake_head();
-struct fb_copyarea* get_snake_tail();
+struct fb_copyarea *get_snake_head();
+struct fb_copyarea *get_snake_tail();
 uint16_t head_index();
 uint16_t tail_index();
-struct fb_copyarea * get_body_part(size_t body_index);
+struct fb_copyarea *get_body_part(size_t body_index);
 unsigned int get_score();
 
 void setup_snake();
