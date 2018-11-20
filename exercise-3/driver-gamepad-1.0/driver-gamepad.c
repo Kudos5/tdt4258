@@ -27,8 +27,8 @@ static int gp_fasync(int fd, struct file *filp, int on);
 
 // Module variables
 static struct class * gp_cl;
-struct cdev * gp_cdev_ptr;
-dev_t gp_dev_number;
+static struct cdev * gp_cdev_ptr;
+static dev_t gp_dev_number;
 static struct fasync_struct * gp_async_queue;
 static int unsigned gp_button_state;
 static struct file_operations gp_fops = {
