@@ -15,7 +15,6 @@
 
 #include "driver-gamepad-1.0/driver-gamepad.h"
 
-#define NUM_PLAYERS 1	// TODO : Consider making this dynamic, so that # players can be decided in a menu?
 #define SNAKE_MAX_LENGTH 10
 #define SNAKE_START_LENGTH 5
 #define SCREEN_WIDTH 320
@@ -40,7 +39,7 @@ static struct fb_copyarea game_food = {
     .height = FOOD_SIZE,
 };
    
-static struct Player players[NUM_PLAYERS];
+static struct Player player;
 
 static int gp_fd;
 static int fb_fd;
@@ -49,7 +48,6 @@ static uint16_t * game_screen;
 
 static int flag_button_pressed;
 static int flag_update_screen_timer;
-static int flag_game_started;
 
 static int game_button_state;
 
@@ -63,9 +61,7 @@ static void SetArea(struct fb_copyarea * area, uint16_t colour);
 
 static void GameOver() {
     printf("Game over\n");
-    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
-        printf("Player %u score: %u\n", i, players[i].score);
-    }
+    printf("Score: %u\n", player.score);
 }
 
 static void SetupTimer() {
@@ -112,63 +108,46 @@ static int DetectCollision(struct fb_copyarea * area_a, struct fb_copyarea * are
 }
 
 static int DetectCollisionWithEdgeOfScreen() {
-    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
-        struct Player * player = &players[i];
-        struct fb_copyarea * snake_head = &(player->snake[player->head_index]);
-        printf("%d\n", player->direction);
-        printf("%u\n", snake_head->dx);
-        printf("%u\n", snake_head->dy);
-        switch (player->direction) {
-            case UP:
-                return snake_head->dy == 0;
-                break;
-            case DOWN:
-                return snake_head->dy >= (SCREEN_HEIGHT - DELTA_Y);
-                break;
-            case LEFT:
-                return snake_head->dx == 0;
-                break;
-            case RIGHT:
-                return snake_head->dx >= (SCREEN_WIDTH - DELTA_X);
-                break;
-        };
-    }
+    struct fb_copyarea * snake_head = &(player.snake[player.head_index]);
+    printf("%d\n", player.direction);
+    printf("%u\n", snake_head->dx);
+    printf("%u\n", snake_head->dy);
+    switch (player.direction) {
+        case UP:
+            return snake_head->dy == 0;
+            break;
+        case DOWN:
+            return snake_head->dy >= (SCREEN_HEIGHT - DELTA_Y);
+            break;
+        case LEFT:
+            return snake_head->dx == 0;
+            break;
+        case RIGHT:
+            return snake_head->dx >= (SCREEN_WIDTH - DELTA_X);
+            break;
+    };
     return 0;
 }
 
 static int DetectCollisionWithSelf() {
-    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
-        struct Player * player = &players[i];
-        struct fb_copyarea * snake_head = &player->snake[player->head_index];
-        for ( size_t j = player->tail_index; j != player->head_index; j = ((j+1)%SNAKE_MAX_LENGTH) ) {
-            // Make sure to skip the head
-            if ( j == player->head_index ) {
-                continue;
-            }
-            if ( DetectCollision(snake_head, &player->snake[j]) ) {
-                return 1;
-            }
+    struct fb_copyarea * snake_head = &player.snake[player.head_index];
+    for ( size_t j = player.tail_index; j != player.head_index; j = ((j+1)%SNAKE_MAX_LENGTH) ) {
+        // Make sure to skip the head
+        if ( j == player.head_index ) {
+            continue;
         }
-    }
-    return 0;
-}
-
-static int DetectCollisionBetweenSnakes() {
-    // TODO
-    return 0;
-}
-
-static int DetectCollisionWithFood(size_t * player_id) {
-    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
-        struct Player * player = &players[i];
-        struct fb_copyarea * snake_head = &player->snake[player->head_index];
-        if ( DetectCollision(snake_head, &game_food) ) {
-            *player_id = i;
+        if ( DetectCollision(snake_head, &player.snake[j]) ) {
             return 1;
         }
     }
     return 0;
 }
+
+static int DetectCollisionWithFood() {
+    struct fb_copyarea * snake_head = &player.snake[player.head_index];
+    return DetectCollision(snake_head, &game_food);
+}
+
 void SpawnFood() {
     // TODO: Do not spawn food on top of the snake
     int dx = rand() % (SCREEN_WIDTH-FOOD_SIZE);
@@ -194,25 +173,21 @@ void alarm_handler(int signum) {
     flag_update_screen_timer = 1;
 }
     
-static struct Player players[NUM_PLAYERS];
-
-void SetupPlayers() {
-    for (int p = 0; p < NUM_PLAYERS; p++) {
-	    players[p].length = SNAKE_START_LENGTH;
-	    players[p].tail_index = 0;
-	    players[p].head_index = SNAKE_START_LENGTH - 1;
-	/* Initialize snake blocks */
-        for (int sb = 0; sb < SNAKE_MAX_LENGTH; sb++) {
-            players[p].snake[sb].dx = SCREEN_WIDTH/2;	// TODO : Do something smart here, to avoid...
-            players[p].snake[sb].dy = SCREEN_HEIGHT/2;	// ...overwriting blocks that we don't want to clear
-            players[p].snake[sb].width = DELTA_X;  // Also, consider making the position random.
-            players[p].snake[sb].height = DELTA_Y; // Or just make eash snake start in its own corner
-        }
-        players[p].direction = DOWN;
-        printf("%d\n", players[0].direction);
-        players[p].color = 0xFFFF;
-        players[p].length = SNAKE_START_LENGTH;
+void SetupPlayer() {
+    player.length = SNAKE_START_LENGTH;
+    player.tail_index = 0;
+    player.head_index = SNAKE_START_LENGTH - 1;
+/* Initialize snake blocks */
+    for (int sb = 0; sb < SNAKE_MAX_LENGTH; sb++) {
+        player.snake[sb].dx = SCREEN_WIDTH/2;	// TODO : Do something smart here, to avoid...
+        player.snake[sb].dy = SCREEN_HEIGHT/2;	// ...overwriting blocks that we don't want to clear
+        player.snake[sb].width = DELTA_X;  // Also, consider making the position random.
+        player.snake[sb].height = DELTA_Y; // Or just make eash snake start in its own corner
     }
+    player.direction = DOWN;
+    printf("%d\n", player.direction);
+    player.color = 0xFFFF;
+    player.length = SNAKE_START_LENGTH;
 }
 
 void input_handler(int signum) {
@@ -271,23 +246,23 @@ void DrawBackground() {
 #define BTN_L_RIGHT(btn_state) ((btn_state) & 0x04)
 #define BTN_L_DOWN(btn_state) ((btn_state) & 0x08)
 
-static inline void change_direction(struct Player* player, int change_dir) {
+static inline void change_direction(int change_dir) {
     // Don't allow changing direction 180 degrees
-    switch (player->direction) {
+    switch (player.direction) {
     case LEFT:
-	player->direction = (change_dir == RIGHT ? LEFT : change_dir);
+	player.direction = (change_dir == RIGHT ? LEFT : change_dir);
 	break;
     case RIGHT:
-	player->direction = (change_dir == LEFT ? RIGHT : change_dir);
+	player.direction = (change_dir == LEFT ? RIGHT : change_dir);
 	break;
     case UP:
-	player->direction = (change_dir == DOWN ? UP : change_dir);
+	player.direction = (change_dir == DOWN ? UP : change_dir);
 	break;
     case DOWN:
-	player->direction = (change_dir == UP ? DOWN : change_dir);
+	player.direction = (change_dir == UP ? DOWN : change_dir);
 	break;
     default:
-  	player->direction = DOWN;
+  	player.direction = DOWN;
     }
 }
 
@@ -299,19 +274,19 @@ static inline void button_action(int button_state) {
     prev_button_state = button_state;
 
     if (BTN_L_LEFT(newly_pressed))
-	change_direction(&players[0], LEFT);
+	change_direction(LEFT);
     if (BTN_L_RIGHT(newly_pressed))
-	change_direction(&players[0], RIGHT);
+	change_direction(RIGHT);
     if (BTN_L_UP(newly_pressed))
-	change_direction(&players[0], UP);
+	change_direction(UP);
     if (BTN_L_DOWN(newly_pressed))
-	change_direction(&players[0], DOWN);
+	change_direction(DOWN);
 } 
 
-static inline void move_snake(struct Player* p) {
-    int new_x = p->snake[p->head_index].dx;
-    int new_y = p->snake[p->head_index].dy;
-    switch(p->direction) {
+static inline void move_snake() {
+    int new_x = player.snake[player.head_index].dx;
+    int new_y = player.snake[player.head_index].dy;
+    switch(player.direction) {
     case LEFT:
         new_x -= DELTA_X;
         break;
@@ -326,42 +301,39 @@ static inline void move_snake(struct Player* p) {
         break;
     }
     /* TODO : Game over when hitting wall */
-    if (new_x < 0 || (new_x + p->snake[p->head_index].width) > SCREEN_WIDTH)
+    if (new_x < 0 || (new_x + player.snake[player.head_index].width) > SCREEN_WIDTH)
         return;
-    if (new_y < 0 || (new_y + p->snake[p->head_index].height) > SCREEN_HEIGHT)
+    if (new_y < 0 || (new_y + player.snake[player.head_index].height) > SCREEN_HEIGHT)
         return;
 
     /* Clear the tail block in the snake array */
     // TODO : Right now ClearArea will update the screen, which is unnecessary
-    ClearArea(&(p->snake[p->tail_index]));
+    ClearArea(&(player.snake[player.tail_index]));
 
     /* Update snake head (index and block) and tail (index) */
-    p->tail_index = (p->tail_index + 1) % SNAKE_MAX_LENGTH;
-    p->head_index = (p->head_index + 1) % SNAKE_MAX_LENGTH;
-    p->snake[p->head_index].dx = new_x;
-    p->snake[p->head_index].dy = new_y;
+    player.tail_index = (player.tail_index + 1) % SNAKE_MAX_LENGTH;
+    player.head_index = (player.head_index + 1) % SNAKE_MAX_LENGTH;
+    player.snake[player.head_index].dx = new_x;
+    player.snake[player.head_index].dy = new_y;
     /* Draw the new block, i.e. the game_cursor */
-    SetArea(&(p->snake[p->head_index]), p->color);
+    SetArea(&(player.snake[player.head_index]), player.color);
     
 }
 
-static inline void update_snakes() {
-    for (int p = 0; p < NUM_PLAYERS; p++) {
-        move_snake(&players[p]);
-    }
-    /* TODO: Put collision detection here */
+static inline void update_snake() {
+    move_snake();
 }
 
-int SnakeGrow(struct Player* p) {
+int SnakeGrow() {
     /* Victory! Don't grow */
-    if (++(p->length) >= SNAKE_MAX_LENGTH) {
+    if (++(player.length) >= SNAKE_MAX_LENGTH) {
         return 0;
     }
     
-    printf("tail_p: %d \n", p->tail_index);
+    printf("tail_p: %d \n", player.tail_index);
     /* Set tail to tail-1, so that we don't overwrite the tail on next move_snake */
-    p->tail_index = ( p->tail_index == 0 ? SNAKE_MAX_LENGTH-1 : p->tail_index-1 );
-    printf("tail: %d \n", p->tail_index);
+    player.tail_index = ( player.tail_index == 0 ? SNAKE_MAX_LENGTH-1 : player.tail_index-1 );
+    printf("tail: %d \n", player.tail_index);
 /*
     if (p->tail_index == 0)
 	p->tail_index = p->length - 1;
@@ -384,9 +356,7 @@ int SnakeGrow(struct Player* p) {
 
 
 void PrintState() {
-    for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
-        printf("Player %u score: %u\n", i, players[i].score);
-    }
+    printf("score: %u\n", player.score);
 }
 
 int main()
@@ -412,7 +382,7 @@ int main()
     SetupTimer();
     signal(SIGALRM, &alarm_handler);
     DrawBackground();
-    SetupPlayers();
+    SetupPlayer();
     while (1) {
         pause();
         if ( flag_button_pressed ) {
@@ -425,24 +395,18 @@ int main()
                 GameOver();
                 break;
             }
-            update_snakes();
+            update_snake();
             if ( DetectCollisionWithSelf() ) {
                 printf("Collided with self\n");
                 GameOver();
                 break;
             }
-            if ( DetectCollisionBetweenSnakes() ) {
-                printf("Collision with other player\n");
-                GameOver();
-                break;
-            }
-            size_t player_id;
-            if ( DetectCollisionWithFood(&player_id) ) {
-                ++players[player_id].score;
+            if ( DetectCollisionWithFood() ) {
+                ++player.score;
                 game_food_eaten = 1;
                 PrintState();
                 /* If snake has reached SNAKE_MAX_LENGTH*/
-                if (!SnakeGrow(&players[0])) {
+                if (!SnakeGrow(player)) {
                     printf("You win\n");
                     GameOver();
                     break;
