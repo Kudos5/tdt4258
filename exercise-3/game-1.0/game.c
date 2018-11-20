@@ -50,6 +50,7 @@ static int flag_button_pressed;
 static int flag_update_screen_timer;
 
 static int game_button_state;
+static int new_direction;
 
 static uint16_t const game_background_colour = 0x0000;
 static uint16_t const game_cursor_colour = 0xFFFF;
@@ -112,7 +113,7 @@ static int DetectCollisionWithEdgeOfScreen() {
     printf("%d\n", player.direction);
     printf("%u\n", snake_head->dx);
     printf("%u\n", snake_head->dy);
-    switch (player.direction) {
+    switch (new_direction) {
         case UP:
             return snake_head->dy == 0;
             break;
@@ -250,19 +251,19 @@ static inline void change_direction(int change_dir) {
     // Don't allow changing direction 180 degrees
     switch (player.direction) {
     case LEFT:
-	player.direction = (change_dir == RIGHT ? LEFT : change_dir);
+	new_direction = (change_dir == RIGHT ? LEFT : change_dir);
 	break;
     case RIGHT:
-	player.direction = (change_dir == LEFT ? RIGHT : change_dir);
+	new_direction = (change_dir == LEFT ? RIGHT : change_dir);
 	break;
     case UP:
-	player.direction = (change_dir == DOWN ? UP : change_dir);
+	new_direction = (change_dir == DOWN ? UP : change_dir);
 	break;
     case DOWN:
-	player.direction = (change_dir == UP ? DOWN : change_dir);
+	new_direction = (change_dir == UP ? DOWN : change_dir);
 	break;
     default:
-  	player.direction = DOWN;
+  	new_direction = DOWN;
     }
 }
 
@@ -281,11 +282,12 @@ static inline void button_action(int button_state) {
 	change_direction(UP);
     if (BTN_L_DOWN(newly_pressed))
 	change_direction(DOWN);
-} 
+}
 
 static inline void move_snake() {
     int new_x = player.snake[player.head_index].dx;
     int new_y = player.snake[player.head_index].dy;
+    player.direction = new_direction;
     switch(player.direction) {
     case LEFT:
         new_x -= DELTA_X;
