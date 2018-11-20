@@ -1,12 +1,8 @@
-/*
- * This is a demo Linux kernel module.
- */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
-// #include <linux/types.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/fs.h>
@@ -49,7 +45,6 @@ dev_t gp_dev_number;
 static struct fasync_struct * gp_async_queue;
 static int unsigned gp_button_state;
 
-
 static void setupGPIO(void) {
     // TODO: Implement without hardcoding adresses.
     // Is it possible to get all adresses, or do we have to hardcode offsets?
@@ -82,36 +77,11 @@ static void setupGPIO(void) {
     current_value = ioread32(GPIO_IFC);
     new_value = current_value | ioread32(GPIO_IF);
     iowrite32(new_value, GPIO_IFC);
-
-    // TODO: Remove usage of LEDs
-    // Enable LEDs PA12, PA13 and PA14 for testing
-    // We must be careful not to change any of the configurations for these registers
-    /*
-    current_value = ioread32(GPIO_PA_MODEH);
-    new_value = current_value | 0x05550000;
-    iowrite32(new_value, GPIO_PA_MODEH);
-    */
-
-    // turn on LEDs D4-D8 (LEDs are active low)
-    /*
-    current_value = ioread32(GPIO_PA_DOUT);
-    new_value = current_value & ~(1 << 12);
-    new_value = new_value & ~(1 << 13);
-    new_value = new_value & ~(1 << 14);
-    iowrite32(new_value, GPIO_PA_DOUT);
-    */
 }
 
-static irqreturn_t ToggleLeds(int irq, void * dev) {
+static irqreturn_t isr_store_button_state(int irq, void * dev) {
     int long unsigned current_value;
     int long unsigned new_value;
-    /*
-    current_value = ioread32(GPIO_PA_DOUT);
-    new_value = current_value ^ (1 << 12);
-    new_value = new_value ^ (1 << 13);
-    new_value = new_value ^ (1 << 14);
-    iowrite32(new_value, GPIO_PA_DOUT);
-    */
 
 	// Clear the interrupt to avoid repeating interrupts
     current_value = ioread32(GPIO_IFC);
@@ -207,30 +177,22 @@ static int gp_probe(struct platform_device * p_dev_ptr) {
     int gpio_odd_irq;
     struct resource * res;
     RegisterChrDev();
-    // PrintPDev(p_dev_ptr);
 
     // Get info about GPIO
     res = platform_get_resource(p_dev_ptr, IORESOURCE_MEM, 0);
-    // printk("GPIO start: %#08X\n", res->start);
-    // printk("GPIO end: %#08X\n", res->end);
     // Get GPIO IRQ number
     gpio_even_irq = platform_get_irq(p_dev_ptr, 0);
     gpio_odd_irq = platform_get_irq(p_dev_ptr, 1);
-    // printk("GPIO even IRQ: %d\n", gpio_even_irq);
-    // printk("GPIO odd IRQ: %d\n", gpio_odd_irq);
     setupGPIO();
     // Register an interrupt
-    if (request_irq(gpio_even_irq, ToggleLeds, IRQF_SHARED, "gpio_even", p_dev_ptr)) {
+    if (request_irq(gpio_even_irq, isr_store_button_state, IRQF_SHARED, "gpio_even", p_dev_ptr)) {
         printk(KERN_ERR "rtc: cannot register IRQ %d\n", gpio_even_irq);
         return -EIO;
     }
-    if (request_irq(gpio_odd_irq, ToggleLeds, IRQF_SHARED, "gpio_odd", p_dev_ptr)) {
+    if (request_irq(gpio_odd_irq, isr_store_button_state, IRQF_SHARED, "gpio_odd", p_dev_ptr)) {
         printk(KERN_ERR "rtc: cannot register IRQ %d\n", gpio_odd_irq);
         return -EIO;
     }
-
-    // Setup interrupt to send signal
-    // TODO
     return 0;
 }
 
@@ -261,39 +223,21 @@ static struct platform_driver gp_driver = {
     },
 };
 
-
-/*
- * template_init - function to insert this module into kernel space
- *
- * This is the first of two exported functions to handle inserting this
- * code into a running kernel
- *
- * Returns 0 if successfull, otherwise -1
- */
-
-static int __init template_init(void) {
+static int __init gp_init(void) {
     int ret;
     // Register as platform driver
     if ( (ret = platform_driver_register(&gp_driver)) != 0 ) {
         printk("Failed to register platform device: %d\n", ret);
         return ret;
     }
-    // RegisterChrDev();
 	return 0;
 }
 
-/*
- * template_cleanup - function to cleanup this module from kernel space
- *
- * This is the second of two exported functions to handle cleanup this
- * code from a running kernel
- */
-
-static void __exit template_cleanup(void) {
+static void __exit gp_cleanup(void) {
 }
 
-module_init(template_init);
-module_exit(template_cleanup);
+module_init(gp_init);
+module_exit(gp_cleanup);
 
 
 MODULE_DESCRIPTION("Gamepad driver");
