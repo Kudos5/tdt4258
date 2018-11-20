@@ -11,6 +11,7 @@
 #include <linux/fs.h>
 #include <time.h>
 #include <sys/time.h>
+#include <string.h>
 
 #include "driver-gamepad-1.0/driver-gamepad.h"
 
@@ -48,6 +49,7 @@ static uint16_t * game_screen;
 
 static int flag_button_pressed;
 static int flag_update_screen_timer;
+static int flag_game_started;
 
 static int game_button_state;
 
@@ -113,6 +115,9 @@ static int DetectCollisionWithEdgeOfScreen() {
     for ( size_t i = 0; i < NUM_PLAYERS; ++i ) {
         struct Player * player = &players[i];
         struct fb_copyarea * snake_head = &(player->snake[player->head_index]);
+        printf("%d\n", player->direction);
+        printf("%u\n", snake_head->dx);
+        printf("%u\n", snake_head->dy);
         switch (player->direction) {
             case UP:
                 return snake_head->dy == 0;
@@ -198,18 +203,20 @@ void SetupPlayers() {
 	    players[p].head_index = SNAKE_START_LENGTH - 1;
 	/* Initialize snake blocks */
         for (int sb = 0; sb < SNAKE_MAX_LENGTH; sb++) {
-            players[p].snake[sb].dx = 0;	// TODO : Do something smart here, to avoid...
-            players[p].snake[sb].dy = 0;	// ...overwriting blocks that we don't want to clear
+            players[p].snake[sb].dx = SCREEN_WIDTH/2;	// TODO : Do something smart here, to avoid...
+            players[p].snake[sb].dy = SCREEN_HEIGHT/2;	// ...overwriting blocks that we don't want to clear
             players[p].snake[sb].width = DELTA_X;  // Also, consider making the position random.
             players[p].snake[sb].height = DELTA_Y; // Or just make eash snake start in its own corner
         }
         players[p].direction = DOWN;
+        printf("%d\n", players[0].direction);
         players[p].color = 0xFFFF;
         players[p].length = SNAKE_START_LENGTH;
     }
 }
 
 void input_handler(int signum) {
+    printf("Button pressed\n");
     signum = signum;
     game_button_state = ioctl(gp_fd, GP_IOCTL_GET_BUTTON_STATE);
     flag_button_pressed = 1;
@@ -413,12 +420,12 @@ int main()
             flag_button_pressed = 0;
         } 
         if (flag_update_screen_timer) {
-            update_snakes();
             if ( DetectCollisionWithEdgeOfScreen() ) {
                 printf("Collided with edge\n");
                 GameOver();
                 break;
             }
+            update_snakes();
             if ( DetectCollisionWithSelf() ) {
                 printf("Collided with self\n");
                 GameOver();
