@@ -16,6 +16,8 @@ all: game
 clean:
 	-rm -f game
 
+game: snake.c game.c
+
 install:
 
 

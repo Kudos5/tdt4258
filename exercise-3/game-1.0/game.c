@@ -14,34 +14,15 @@
 #include <string.h>
 
 #include "driver-gamepad-1.0/driver-gamepad.h"
+#include "snake.h"
 
-#define SNAKE_MAX_LENGTH 100
 #define GAME_TIMER_MAX 250
 #define GAME_TIMER_MIN 50
-#define SNAKE_START_LENGTH 5
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
-#define DELTA_X 10
-#define DELTA_Y 10
-#define FOOD_SIZE 10
-
-enum { UP, DOWN, LEFT, RIGHT };
-struct Player {
-    struct fb_copyarea snake[SNAKE_MAX_LENGTH];	// Array of entire snake (body and head)
-    uint16_t head_index;			// Position of the snake head
-    uint16_t tail_index;			// Position of the snake tail
-    uint16_t length;				// Array of entire snake (body and head)
-    uint16_t color;
-    int direction;				// Keep track of which way snake is moving
-    int unsigned score;
-};
 
 static struct fb_copyarea game_food = {
     .width = FOOD_SIZE,
     .height = FOOD_SIZE,
 };
-   
-static struct Player player;
 
 static int gp_fd;
 static int fb_fd;
@@ -52,7 +33,6 @@ static int flag_button_pressed;
 static int flag_update_screen_timer;
 
 static int game_button_state;
-static int new_direction;
 
 static uint16_t const game_background_colour = 0x0000;
 static uint16_t const game_cursor_colour = 0xFFFF;
@@ -65,7 +45,7 @@ static void set_area(struct fb_copyarea * area, uint16_t colour);
 
 static void game_over() {
     printf("Game over\n");
-    printf("Score: %u\n", player.score);
+    printf("Score: %u\n", get_score());
 }
 
 static void setup_timer(int ms) {
@@ -110,10 +90,9 @@ static int detect_collision(struct fb_copyarea * area_a, struct fb_copyarea * ar
     }
     return 1;
 }
-
-static int detect_collision_with_edge_of_screen() {
-    struct fb_copyarea * snake_head = &(player.snake[player.head_index]);
-    switch (new_direction) {
+static int detect_collision_edge() {
+    struct fb_copyarea * snake_head = get_snake_head();
+    switch (get_snake_direction()) {
         case UP:
             return snake_head->dy == 0;
             break;
@@ -130,22 +109,19 @@ static int detect_collision_with_edge_of_screen() {
     return 0;
 }
 
-static int detect_collision_with_self() {
-    struct fb_copyarea * snake_head = &player.snake[player.head_index];
-    for ( size_t j = player.tail_index; j != player.head_index; j = ((j+1)%SNAKE_MAX_LENGTH) ) {
+static int detect_collision_self() {
+    struct fb_copyarea * snake_head = get_snake_head();
+    for ( size_t j = tail_index(); j != head_index(); j = ((j+1)%SNAKE_MAX_LENGTH) ) {
         // Make sure to skip the head
-        if ( j == player.head_index ) {
-            continue;
-        }
-        if ( detect_collision(snake_head, &player.snake[j]) ) {
+        if ( detect_collision(snake_head, get_body_part(j)) ) {
             return 1;
         }
     }
     return 0;
 }
 
-static int detect_collision_with_food() {
-    struct fb_copyarea * snake_head = &player.snake[player.head_index];
+static int detect_collision_food() {
+    struct fb_copyarea * snake_head = get_snake_head();
     return detect_collision(snake_head, &game_food);
 }
 
@@ -172,22 +148,6 @@ void alarm_handler(int signum) {
     // Just to avoid warnings
     signum = signum;
     flag_update_screen_timer = 1;
-}
-    
-void SetupPlayer() {
-    player.length = SNAKE_START_LENGTH;
-    player.tail_index = 0;
-    player.head_index = SNAKE_START_LENGTH - 1;
-/* Initialize snake blocks */
-    for (int sb = 0; sb < SNAKE_MAX_LENGTH; sb++) {
-        player.snake[sb].dx = SCREEN_WIDTH/2;	// TODO : Do something smart here, to avoid...
-        player.snake[sb].dy = SCREEN_HEIGHT/2;	// ...overwriting blocks that we don't want to clear
-        player.snake[sb].width = DELTA_X;  // Also, consider making the position random.
-        player.snake[sb].height = DELTA_Y; // Or just make eash snake start in its own corner
-    }
-    player.direction = DOWN;
-    player.color = 0xFFFF;
-    player.length = SNAKE_START_LENGTH;
 }
 
 void input_handler(int signum) {
@@ -241,27 +201,7 @@ void clear_screen() {
 #define BTN_L_RIGHT(btn_state) ((btn_state) & 0x04)
 #define BTN_L_DOWN(btn_state) ((btn_state) & 0x08)
 
-static inline void change_direction(int change_dir) {
-    // Don't allow changing direction 180 degrees
-    switch (player.direction) {
-    case LEFT:
-	new_direction = (change_dir == RIGHT ? LEFT : change_dir);
-	break;
-    case RIGHT:
-	new_direction = (change_dir == LEFT ? RIGHT : change_dir);
-	break;
-    case UP:
-	new_direction = (change_dir == DOWN ? UP : change_dir);
-	break;
-    case DOWN:
-	new_direction = (change_dir == UP ? DOWN : change_dir);
-	break;
-    default:
-  	new_direction = DOWN;
-    }
-}
 
-/* TODO? Make button to player mapping dynamic  */
 static inline void button_action(int button_state) {
     static int prev_button_state = 0xFF;
 
@@ -276,81 +216,6 @@ static inline void button_action(int button_state) {
 	change_direction(UP);
     if (BTN_L_DOWN(newly_pressed))
 	change_direction(DOWN);
-}
-
-static inline void move_snake() {
-    int new_x = player.snake[player.head_index].dx;
-    int new_y = player.snake[player.head_index].dy;
-    player.direction = new_direction;
-    switch(player.direction) {
-    case LEFT:
-        new_x -= DELTA_X;
-        break;
-    case RIGHT:
-        new_x += DELTA_X;
-        break;
-    case UP:
-        new_y -= DELTA_Y;
-        break;
-    case DOWN:
-        new_y += DELTA_Y;
-        break;
-    }
-    /* TODO : Game over when hitting wall */
-    if (new_x < 0 || (new_x + player.snake[player.head_index].width) > SCREEN_WIDTH)
-        return;
-    if (new_y < 0 || (new_y + player.snake[player.head_index].height) > SCREEN_HEIGHT)
-        return;
-
-    /* Clear the tail block in the snake array */
-    // TODO : Right now clear_area will update the screen, which is unnecessary
-    clear_area(&(player.snake[player.tail_index]));
-
-    /* Update snake head (index and block) and tail (index) */
-    player.tail_index = (player.tail_index + 1) % SNAKE_MAX_LENGTH;
-    player.head_index = (player.head_index + 1) % SNAKE_MAX_LENGTH;
-    player.snake[player.head_index].dx = new_x;
-    player.snake[player.head_index].dy = new_y;
-    /* Draw the new block, i.e. the game_cursor */
-    set_area(&(player.snake[player.head_index]), player.color);
-    
-}
-
-static inline void update_snake() {
-    move_snake();
-}
-
-int SnakeGrow() {
-    /* Victory! Don't grow */
-    if (++(player.length) >= SNAKE_MAX_LENGTH) {
-        return 0;
-    }
-    
-    /* Set tail to tail-1, so that we don't overwrite the tail on next move_snake */
-    player.tail_index = ( player.tail_index == 0 ? SNAKE_MAX_LENGTH-1 : player.tail_index-1 );
-/*
-    if (p->tail_index == 0)
-	p->tail_index = p->length - 1;
-    else
-	p->tail_index--;
-*/   
-    return 1;
-    /*
-    if (p->length >= SNAKE_MAX_LENGTH){
-	// victory
-    }
-    // If head is last block, everything's good
-    if (p->head_index+2 >= p->length-1) 
-	return;
-    // Unless head is the last block, shift everything right of the head to the right
-    for (uint16_t i = p->length-1; i != p->head_index+2; i--) {
-	p->snake[i] = p->snake[i-1];
-    } */
-}
-
-
-void print_state() {
-    printf("score: %u\n", player.score);
 }
 
 int main()
@@ -374,8 +239,8 @@ int main()
     // the screen
     setup_timer(GAME_TIMER_MAX);
     signal(SIGALRM, &alarm_handler);
-    DrawBackground();
-    SetupPlayer();
+    clear_screen();
+    setup_snake();
 	printf("Game started\n");
     while (1) {
         pause();
@@ -384,28 +249,31 @@ int main()
             flag_button_pressed = 0;
         } 
         if (flag_update_screen_timer) {
-            if ( detect_collision_with_edge_of_screen() ) {
+            if ( detect_collision_edge() ) {
+                printf("Collided with edge\n");
                 game_over();
                 break;
             }
-            update_snake();
-            if ( detect_collision_with_self() ) {
+            clear_area(get_snake_tail());
+            move_snake();
+            set_area(get_snake_head(), SNAKE_COLOR);
+            if ( detect_collision_self() ) {
+                printf("Collided with self\n");
                 game_over();
                 break;
             }
-            if ( detect_collision_with_food() ) {
-                ++player.score;
-                if ( game_timer_ms > GAME_TIMER_MIN ) {
-                    game_timer_ms = GAME_TIMER_MAX - player.score*10;
-                    setup_timer(game_timer_ms);
-                }
+            if ( detect_collision_food() ) {
                 game_food_eaten = 1;
                 print_state();
                 /* If snake has reached SNAKE_MAX_LENGTH*/
-                if (!SnakeGrow(player)) {
+                if (!snake_grow()) {
                     printf("You win\n");
                     game_over();
                     break;
+                }
+                if ( game_timer_ms > GAME_TIMER_MIN ) {
+                    game_timer_ms = GAME_TIMER_MAX - get_score()*10;
+                    setup_timer(game_timer_ms);
                 }
             }
             update_screen();
