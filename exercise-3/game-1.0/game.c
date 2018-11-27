@@ -37,7 +37,7 @@ static int game_button_state;
 static uint16_t const game_background_colour = 0x0000;
 static uint16_t const game_cursor_colour = 0xFFFF;
 static uint16_t const game_food_colour = 0xF000;
-static int unsigned game_timer_ms = 250;
+static int unsigned game_timer_ms = GAME_TIMER_MAX;
 static int game_food_eaten = 1;
 
 // Function declarations
